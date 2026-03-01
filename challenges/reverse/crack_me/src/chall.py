@@ -1,5 +1,5 @@
 import sys
-SECRET = [ord(c) ^ 0x42 for c in "CTF{8b4ba8a2b26b70da438de6c3}"]
+SECRET = [ord(c) ^ 0x42 for c in "CTF{8b96953f5787504687776243}"]
 
 def check(inp):
     return len(inp) == len(SECRET) and all(ord(c)^0x42==s for c,s in zip(inp, SECRET))

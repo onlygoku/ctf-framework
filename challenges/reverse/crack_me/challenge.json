@@ -1,16 +1,16 @@
 {
-  "id": "4611dcb2",
+  "id": "5a7b7943",
   "name": "Crack Me",
   "category": "reverse",
   "points": 150,
   "difficulty": "easy",
-  "description": "A Python binary checks your input against a secret key using XOR encoding. Reverse the logic and figure out what input makes it print Correct!",
+  "description": "A Python binary checks your input against a secret key using XOR encoding. Reverse it!",
   "author": "anonymous",
   "solves": 0,
   "hints": [],
   "files": [],
   "tags": [],
   "docker_enabled": false,
-  "created_at": "2026-02-28T18:18:19.664392",
+  "created_at": "2026-03-01T11:44:30.308457",
   "path": "challenges\\reverse\\crack_me"
 }

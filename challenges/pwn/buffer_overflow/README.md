@@ -1,10 +1,10 @@
 # Buffer Overflow - Binary Exploitation
 
 ## Description
-A vulnerable C binary is running on the server. There is no stack canary and no PIE. Overflow the buffer and hijack execution to call the win() function.
+A vulnerable C binary is running on the server. Overflow the buffer and hijack execution.
 
 ## Connection
 `nc challenge.ctf.local 10003`
 
 ## Flag
-`CTF{CTF{03b41ca277be8e0d1513aa4f}}`
+`CTF{CTF{635bec841b50ccd36b3510b7}}`

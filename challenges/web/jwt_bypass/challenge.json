@@ -1,5 +1,5 @@
 {
-  "id": "73398f74",
+  "id": "37b595ae",
   "name": "JWT Bypass",
   "category": "web",
   "points": 200,
@@ -11,6 +11,6 @@
   "files": [],
   "tags": [],
   "docker_enabled": false,
-  "created_at": "2026-02-28T18:17:42.840839",
+  "created_at": "2026-03-01T11:44:30.285898",
   "path": "challenges\\web\\jwt_bypass"
 }

@@ -1,7 +1,7 @@
 # SQL Injection 101 - Web Challenge
 
 ## Description
-A login form is hiding something. Can you bypass authentication and retrieve the admin flag? Try messing with the input fields.
+A login form is hiding something. Can you bypass authentication and retrieve the admin flag?
 
 ## Flag
-`CTF{CTF{afb36ef39f77c52ae4faae67}}`
+`CTF{CTF{cb838148432ed3caa2518540}}`

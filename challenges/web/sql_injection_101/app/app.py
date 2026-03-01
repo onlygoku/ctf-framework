@@ -2,7 +2,7 @@ from flask import Flask, request, render_template_string
 import os
 
 app = Flask(__name__)
-FLAG = os.environ.get("FLAG", "CTF{afb36ef39f77c52ae4faae67}")
+FLAG = os.environ.get("FLAG", "CTF{cb838148432ed3caa2518540}")
 
 INDEX = """<!DOCTYPE html>
 <html><head><title>SQL Injection 101</title></head>

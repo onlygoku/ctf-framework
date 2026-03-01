@@ -1,6 +1,6 @@
 from Crypto.Util.number import getPrime, bytes_to_long
 
-FLAG = b"CTF{a20ed01ee85b04893c04cd9c}"
+FLAG = b"CTF{faaf19b8177b753a92a0880c}"
 
 def encrypt(msg):
     p, q = getPrime(512), getPrime(512)

@@ -1,2 +1,2 @@
-FLAG = "CTF{9a2e6f40f2d1856b235fea7e}"
+FLAG = "CTF{6aa984de303e526bf25cffa2}"
 # Generate forensics artifact here

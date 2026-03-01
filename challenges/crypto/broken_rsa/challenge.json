@@ -1,16 +1,16 @@
 {
-  "id": "9a271d55",
+  "id": "fe495bc3",
   "name": "Broken RSA",
   "category": "crypto",
   "points": 200,
   "difficulty": "medium",
-  "description": "We intercepted an RSA-encrypted message. The developer reused primes across two public keys. Use that weakness to recover the plaintext.",
+  "description": "We intercepted an RSA-encrypted message. The developer reused primes across two public keys.",
   "author": "anonymous",
   "solves": 0,
   "hints": [],
   "files": [],
   "tags": [],
   "docker_enabled": false,
-  "created_at": "2026-02-28T18:17:55.884821",
+  "created_at": "2026-03-01T11:44:30.292360",
   "path": "challenges\\crypto\\broken_rsa"
 }
