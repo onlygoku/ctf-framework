@@ -1,16 +1,16 @@
 {
-  "id": "37b595ae",
+  "id": "8d6a25e6",
   "name": "JWT Bypass",
   "category": "web",
   "points": 200,
   "difficulty": "medium",
-  "description": "This API uses JSON Web Tokens for authentication. The dev made a classic mistake. Can you forge a token and access the admin panel?",
+  "description": "JWT authentication bypass.",
   "author": "anonymous",
   "solves": 0,
   "hints": [],
   "files": [],
   "tags": [],
   "docker_enabled": false,
-  "created_at": "2026-03-01T11:44:30.285898",
+  "created_at": "2026-03-01T11:47:00.939968",
   "path": "challenges\\web\\jwt_bypass"
 }

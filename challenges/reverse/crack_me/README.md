@@ -1,7 +1,7 @@
 # Crack Me - Web Challenge
 
 ## Description
-A Python binary checks your input against a secret key using XOR encoding. Reverse it!
+XOR encoded secret key.
 
 ## Flag
-`CTF{CTF{8b96953f5787504687776243}}`
+`CTF{CTF{0ba92b42519375d420997dc2}}`

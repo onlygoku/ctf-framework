@@ -1,7 +1,7 @@
 # JWT Bypass - Web Challenge
 
 ## Description
-This API uses JSON Web Tokens for authentication. The dev made a classic mistake. Can you forge a token and access the admin panel?
+JWT authentication bypass.
 
 ## Flag
-`CTF{CTF{ac03496db00e310390650982}}`
+`CTF{CTF{8c231da0a491b6818af83fe1}}`

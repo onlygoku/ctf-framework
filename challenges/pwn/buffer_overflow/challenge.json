@@ -1,16 +1,16 @@
 {
-  "id": "3ca2c7e4",
+  "id": "e4d14818",
   "name": "Buffer Overflow",
   "category": "pwn",
   "points": 300,
   "difficulty": "hard",
-  "description": "A vulnerable C binary is running on the server. Overflow the buffer and hijack execution.",
+  "description": "Overflow the buffer.",
   "author": "anonymous",
   "solves": 0,
   "hints": [],
   "files": [],
   "tags": [],
   "docker_enabled": false,
-  "created_at": "2026-03-01T11:44:30.299544",
+  "created_at": "2026-03-01T11:47:01.860312",
   "path": "challenges\\pwn\\buffer_overflow"
 }

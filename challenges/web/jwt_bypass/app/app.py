@@ -2,7 +2,7 @@ from flask import Flask, request, render_template_string
 import os
 
 app = Flask(__name__)
-FLAG = os.environ.get("FLAG", "CTF{ac03496db00e310390650982}")
+FLAG = os.environ.get("FLAG", "CTF{8c231da0a491b6818af83fe1}")
 
 INDEX = """<!DOCTYPE html>
 <html><head><title>JWT Bypass</title></head>

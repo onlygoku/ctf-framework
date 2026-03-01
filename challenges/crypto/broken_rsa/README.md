@@ -1,7 +1,7 @@
 # Broken RSA - Cryptography Challenge
 
 ## Description
-We intercepted an RSA-encrypted message. The developer reused primes across two public keys.
+RSA with reused primes.
 
 ## Flag
-`CTF{CTF{faaf19b8177b753a92a0880c}}`
+`CTF{CTF{be015f90357d9528d9c1abd9}}`

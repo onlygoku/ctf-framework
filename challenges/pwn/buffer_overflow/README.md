@@ -1,10 +1,10 @@
 # Buffer Overflow - Binary Exploitation
 
 ## Description
-A vulnerable C binary is running on the server. Overflow the buffer and hijack execution.
+Overflow the buffer.
 
 ## Connection
-`nc challenge.ctf.local 10003`
+`nc challenge.ctf.local 10009`
 
 ## Flag
-`CTF{CTF{635bec841b50ccd36b3510b7}}`
+`CTF{CTF{1ac63475b1e2d7b0cb8b781b}}`

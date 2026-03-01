@@ -1,7 +1,7 @@
 # Hidden Message - Web Challenge
 
 ## Description
-We captured a suspicious image file. Something is hidden inside. Look beyond what the eye can see.
+Hidden in an image.
 
 ## Flag
-`CTF{CTF{6aa984de303e526bf25cffa2}}`
+`CTF{CTF{9dfef087e71b6f7db7f48753}}`
