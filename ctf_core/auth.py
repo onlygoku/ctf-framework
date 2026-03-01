@@ -264,3 +264,36 @@ class AuthManager:
             return AuthResult(False, "Already verified!")
         self._send_verification_email(email, row[0])
         return AuthResult(True, "Verification email resent!")
+    
+    def get_all_teams(self) -> list:
+        rows = self.db.fetchall("""
+            SELECT name, email, country, score, solves, verified, banned, created_at
+            FROM teams ORDER BY score DESC
+        """)
+        return [{"name": r[0], "email": r[1], "country": r[2],
+                 "score": r[3], "solves": r[4], "verified": bool(r[5]),
+                 "banned": bool(r[6]), "created_at": r[7]} for r in rows]
+
+    def ban_team(self, team_name: str) -> bool:
+        self.db.execute("UPDATE teams SET banned=1 WHERE name=?", (team_name,))
+        return True
+
+    def unban_team(self, team_name: str) -> bool:
+        self.db.execute("UPDATE teams SET banned=0 WHERE name=?", (team_name,))
+        return True
+
+    def delete_team(self, team_name: str) -> bool:
+        self.db.execute("DELETE FROM teams WHERE name=?", (team_name,))
+        self.db.execute("DELETE FROM solves WHERE team=?", (team_name,))
+        self.db.execute("DELETE FROM sessions WHERE team_name=?", (team_name,))
+        return True
+
+    def reset_team_score(self, team_name: str) -> bool:
+        self.db.execute("UPDATE teams SET score=0, solves=0 WHERE name=?", (team_name,))
+        self.db.execute("DELETE FROM solves WHERE team=?", (team_name,))
+        return True
+
+    def is_admin(self, team_name: str) -> bool:
+        admin = os.getenv("CTF_ADMIN", "admin")
+        return team_name == admin
+    

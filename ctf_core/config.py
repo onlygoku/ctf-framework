@@ -29,3 +29,8 @@ class Config:
     mail_username: str = field(default_factory=lambda: os.getenv("MAIL_USERNAME", ""))
     mail_password: str = field(default_factory=lambda: os.getenv("MAIL_PASSWORD", ""))
     mail_sender: str = field(default_factory=lambda: os.getenv("MAIL_DEFAULT_SENDER", ""))
+    admin_username: str = field(default_factory=lambda: os.getenv("CTF_ADMIN", "admin"))
+    admin_password: str = field(default_factory=lambda: os.getenv("CTF_ADMIN_PASSWORD", "admin123"))
+    start_time: str = field(default_factory=lambda: os.getenv("CTF_START_TIME", ""))
+    end_time: str = field(default_factory=lambda: os.getenv("CTF_END_TIME", ""))
+    
