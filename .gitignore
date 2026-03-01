@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+*.sqlite3
+
+# Virtual environment
+venv/
+.env/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Database
+*.db
+
+# Docker runtime
+docker_data/
+containers/
+
+# Secrets
+config.local.py
+.env
+
+# CTF sensitive
+*/flag.txt
+*/flags.txt
+*/secret*

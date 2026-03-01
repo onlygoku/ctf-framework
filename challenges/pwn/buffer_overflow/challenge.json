@@ -1,0 +1,16 @@
+{
+  "id": "7428d550",
+  "name": "Buffer Overflow",
+  "category": "pwn",
+  "points": 300,
+  "difficulty": "hard",
+  "description": "A vulnerable C binary is running on the server. There is no stack canary and no PIE. Overflow the buffer and hijack execution to call the win() function.",
+  "author": "anonymous",
+  "solves": 0,
+  "hints": [],
+  "files": [],
+  "tags": [],
+  "docker_enabled": false,
+  "created_at": "2026-02-28T18:18:08.478431",
+  "path": "challenges\\pwn\\buffer_overflow"
+}

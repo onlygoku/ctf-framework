@@ -1,0 +1,12 @@
+flask>=3.0.0
+click>=8.1.7
+rich>=13.7.0
+pycryptodome>=3.20.0
+pytest>=7.4.0
+pytest-cov>=4.1.0
+python-dotenv>=1.0.0
+flask-mail>=0.10.0
+flask-limiter>=3.5.0
+flask-login>=0.6.3
+bcrypt>=4.1.2
+itsdangerous>=2.1.2
