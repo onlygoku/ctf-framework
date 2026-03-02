@@ -64,24 +64,35 @@ class ChallengeManager:
 
     def _ensure_schema(self):
         self.db.execute("""
-            CREATE TABLE IF NOT EXISTS challenges (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                category TEXT NOT NULL,
-                points INTEGER NOT NULL,
-                difficulty TEXT NOT NULL,
-                description TEXT DEFAULT '',
-                flag TEXT NOT NULL,
-                author TEXT DEFAULT 'anonymous',
-                solves INTEGER DEFAULT 0,
-                hints TEXT DEFAULT '[]',
-                files TEXT DEFAULT '[]',
-                tags TEXT DEFAULT '[]',
-                docker_enabled INTEGER DEFAULT 0,
-                created_at TEXT,
-                path TEXT DEFAULT ''
-            )
-        """)
+        CREATE TABLE IF NOT EXISTS challenges (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            category TEXT NOT NULL,
+            points INTEGER NOT NULL,
+            difficulty TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            flag TEXT NOT NULL,
+            author TEXT DEFAULT 'anonymous',
+            solves INTEGER DEFAULT 0,
+            hints TEXT DEFAULT '[]',
+            files TEXT DEFAULT '[]',
+            tags TEXT DEFAULT '[]',
+            docker_enabled INTEGER DEFAULT 0,
+            created_at TEXT,
+            path TEXT DEFAULT ''
+        )
+    """)
+        self.db.execute("""
+        CREATE TABLE IF NOT EXISTS hint_unlocks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            team TEXT NOT NULL,
+            challenge_id TEXT NOT NULL,
+            hint_index INTEGER NOT NULL,
+            cost INTEGER NOT NULL,
+            unlocked_at REAL DEFAULT (strftime('%s', 'now')),
+            UNIQUE(team, challenge_id, hint_index)
+        )
+    """)
 
     def create_challenge(self, category, name, points=100, difficulty="medium",
                          description="", author="anonymous", docker_enabled=False) -> Challenge:

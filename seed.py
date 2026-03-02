@@ -32,30 +32,65 @@ if len(existing) >= 11:
 
 challenges = [
     ("web", "SQL Injection 101", 100, "easy",
-     "A login form is hiding something. Can you bypass authentication and retrieve the admin flag?"),
-    ("web", "JWT Bypass", 200, "medium",
-     "This API uses JSON Web Tokens for authentication. The dev made a classic mistake."),
-    ("crypto", "Broken RSA", 200, "medium",
-     "We intercepted an RSA-encrypted message. The developer reused primes across two public keys."),
-    ("pwn", "Buffer Overflow", 300, "hard",
-     "A vulnerable C binary is running on the server. Overflow the buffer and hijack execution."),
-    ("reverse", "Crack Me", 150, "easy",
-     "A Python binary checks your input against a secret key using XOR encoding. Reverse it!"),
-    ("forensics", "Hidden Message", 250, "hard",
-     "We captured a suspicious image file. Something is hidden inside."),
+     "A login form is hiding something. Can you bypass authentication and retrieve the admin flag?",
+     ["Try adding a single quote to the input", "Look up SQL injection login bypass payloads"]),
 
-    # 5 NEW CHALLENGES
+    ("web", "JWT Bypass", 200, "medium",
+     "This API uses JSON Web Tokens for authentication. The dev made a classic mistake.",
+     ["Check the algorithm field in the JWT header", "Try changing the algorithm to 'none'"]),
+
     ("web", "XSS Attack", 150, "medium",
-     "A comment section on this blog reflects user input directly. Inject a script and steal the admin cookie."),
+     "A comment section on this blog reflects user input directly. Inject a script and steal the admin cookie.",
+     ["Try a basic <script>alert(1)</script> first", "Look for ways to steal document.cookie"]),
+
+    ("crypto", "Broken RSA", 200, "medium",
+     "We intercepted an RSA-encrypted message. The developer reused primes across two public keys.",
+     ["Try computing GCD of the two moduli", "Use the common factor to factor both keys"]),
+
     ("crypto", "Caesar's Secret", 100, "easy",
-     "An ancient encryption method was used to hide this message. Shift your thinking and decode the secret."),
+     "An ancient encryption method was used to hide this message. Shift your thinking and decode the secret.",
+     ["Try all 26 possible shifts", "Look for a shift that gives readable English"]),
+
+    ("pwn", "Buffer Overflow", 300, "hard",
+     "A vulnerable C binary is running on the server. Overflow the buffer and hijack execution.",
+     ["Use cyclic pattern to find the offset", "Check for a win() function in the binary"]),
+
+    ("reverse", "Crack Me", 150, "easy",
+     "A Python binary checks your input against a secret key using XOR encoding. Reverse it!",
+     ["XOR is reversible - apply the same key twice", "Try XORing each byte with 0x42"]),
+
+    ("forensics", "Hidden Message", 250, "hard",
+     "We captured a suspicious image file. Something is hidden inside.",
+     ["Try running strings on the file", "Check for steganography tools like steghide"]),
+
     ("osint", "Find The Hacker", 200, "medium",
-     "A hacker left traces across the internet. Use open source intelligence to track them down and find the flag they left behind."),
+     "A hacker left traces across the internet. Use open source intelligence to track them down.",
+     ["Check common social media platforms", "Try searching their username across multiple sites"]),
+
     ("misc", "Base Madness", 100, "easy",
-     "This string has been encoded multiple times using different base encodings. Decode it layer by layer to find the flag."),
+     "This string has been encoded multiple times. Decode it layer by layer.",
+     ["Start with base64 decoding", "Try base64 then base32 then hex"]),
+
     ("network", "Packet Secrets", 250, "hard",
-     "We captured network traffic during a suspicious data transfer. Analyze the pcap file and extract the hidden flag from the packets."),
+     "We captured network traffic during a suspicious data transfer. Analyze the pcap file.",
+     ["Open in Wireshark and filter by protocol", "Follow the TCP stream to see the full data"]),
 ]
+
+for category, name, points, difficulty, desc, hints in challenges:
+    try:
+        ch = manager.create_challenge(
+            category, name, points, difficulty,
+            description=desc
+        )
+        # Save hints to challenge
+        import json
+        manager.db.execute(
+            "UPDATE challenges SET hints=? WHERE id=?",
+            (json.dumps(hints), ch.id)
+        )
+        print(f"[SEED] ✅ {ch.name} — {ch.flag}")
+    except Exception as e:
+        print(f"[SEED] ❌ {name} — {e}")
 for category, name, points, difficulty, desc in challenges:
     try:
         ch = manager.create_challenge(category, name, points, difficulty, description=desc)

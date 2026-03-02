@@ -1,12 +1,12 @@
 """
-Web App - CTF Platform with Admin Panel, Timer, Certificate Generator
+Web App - CTF Platform with Hint System and Graph Scoreboard
 """
 
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from flask import Flask, request, jsonify, render_template_string, redirect
+from flask import Flask, request, jsonify, render_template_string
 from functools import wraps
 from dotenv import load_dotenv
 load_dotenv()
@@ -34,7 +34,7 @@ nav a:hover,nav a.active{color:var(--green)}
 .card h2{font-family:'Orbitron',sans-serif;color:var(--green);margin-bottom:1.5rem;font-size:1.1rem;letter-spacing:.1em}
 .form-group{margin-bottom:1.2rem}
 .form-group label{display:block;font-size:.75rem;color:#6a8;letter-spacing:.1em;margin-bottom:.4rem}
-.form-group input,.form-group select{width:100%;padding:.75rem 1rem;background:var(--bg);border:1px solid var(--border);color:#cde;font-family:'Share Tech Mono',monospace;font-size:.9rem;border-radius:2px;outline:none;transition:border-color .2s}
+.form-group input{width:100%;padding:.75rem 1rem;background:var(--bg);border:1px solid var(--border);color:#cde;font-family:'Share Tech Mono',monospace;font-size:.9rem;border-radius:2px;outline:none;transition:border-color .2s}
 .form-group input:focus{border-color:var(--green)}
 .form-group input::placeholder{color:#3a5a4a}
 .btn{padding:.75rem 1.5rem;font-family:'Share Tech Mono',monospace;font-size:.85rem;letter-spacing:.1em;border:1px solid var(--green);background:transparent;color:var(--green);cursor:pointer;border-radius:2px;transition:background .2s}
@@ -43,7 +43,6 @@ nav a:hover,nav a.active{color:var(--green)}
 .btn-red{border-color:var(--red)!important;color:var(--red)!important}
 .btn-red:hover{background:rgba(255,0,60,.1)!important}
 .btn-blue{border-color:var(--blue)!important;color:var(--blue)!important}
-.btn-blue:hover{background:rgba(0,212,255,.1)!important}
 .btn-sm{padding:.4rem .8rem;font-size:.75rem}
 .alert{padding:.75rem 1rem;border-radius:2px;margin-bottom:1rem;font-size:.85rem}
 .alert-error{background:rgba(255,0,60,.1);border:1px solid rgba(255,0,60,.3);color:var(--red)}
@@ -62,7 +61,6 @@ tr:hover td{background:rgba(0,255,136,.03)}
 .badge-blue{background:rgba(0,212,255,.1);color:var(--blue);border:1px solid rgba(0,212,255,.3)}
 .badge-yellow{background:rgba(255,200,0,.1);color:#fb0;border:1px solid rgba(255,200,0,.3)}
 .section-title{font-family:'Orbitron',sans-serif;font-size:1rem;color:var(--green);letter-spacing:.2em;margin-bottom:1.5rem;padding-bottom:.5rem;border-bottom:1px solid var(--border)}
-.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:2rem}
 .stat-card{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:1.5rem;text-align:center}
 .stat-value{font-family:'Orbitron',sans-serif;font-size:2rem;color:var(--green)}
 .stat-label{font-size:.75rem;color:#6a8;letter-spacing:.1em;margin-top:.25rem}
@@ -78,9 +76,8 @@ function updateTimer() {
   if (!timerEl) return;
   if (!start || isNaN(start)) { timerEl.textContent = 'OPEN'; return; }
   if (now < start) {
-    const diff = start - now;
     timerLabel.textContent = 'STARTS IN';
-    timerEl.textContent = formatTime(diff);
+    timerEl.textContent = formatTime(start - now);
   } else if (now < end) {
     const diff = end - now;
     timerLabel.textContent = 'TIME LEFT';
@@ -109,44 +106,38 @@ LOGIN_HTML = """<!DOCTYPE html>
   <a class="logo" href="/">{{ ctf_name }}<span>//</span>CTF</a>
   <nav><a href="/login" class="active">LOGIN</a><a href="/register">REGISTER</a></nav>
 </header>
-<div class="container">
-  <div class="card">
-    <h2>// TEAM LOGIN</h2>
-    {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
-    {% if success %}<div class="alert alert-success">{{ success }}</div>{% endif %}
-    <div class="form-group"><label>TEAM NAME</label>
-      <input type="text" id="team" placeholder="your_team_name"/></div>
-    <div class="form-group"><label>PASSWORD</label>
-      <input type="password" id="password" placeholder="••••••••"/></div>
-    <button class="btn btn-full" onclick="login()">LOGIN →</button>
-    <div class="text-center"><a href="/register" class="link">No account? Register here</a></div>
-  </div>
-</div>
+<div class="container"><div class="card">
+  <h2>// TEAM LOGIN</h2>
+  <div class="form-group"><label>TEAM NAME</label>
+    <input type="text" id="team" placeholder="your_team_name"/></div>
+  <div class="form-group"><label>PASSWORD</label>
+    <input type="password" id="password" placeholder="••••••••"/></div>
+  <button class="btn btn-full" onclick="login()">LOGIN →</button>
+  <div class="text-center"><a href="/register" class="link">No account? Register here</a></div>
+</div></div>
 <script>
 async function login() {
   const team = document.getElementById('team').value.trim();
   const password = document.getElementById('password').value;
   document.querySelectorAll('.alert').forEach(m=>m.remove());
-  if (!team || !password) return showAlert('Fill in all fields','error');
-  const r = await fetch('/api/v1/auth/login', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({team_name:team, password})
+  if (!team||!password) return showAlert('Fill in all fields','error');
+  const r = await fetch('/api/v1/auth/login',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({team_name:team,password})
   });
   const data = await r.json();
   if (data.success) {
-    localStorage.setItem('ctf_token', data.token);
-    localStorage.setItem('ctf_team', data.team);
-    localStorage.setItem('ctf_is_admin', data.is_admin);
+    localStorage.setItem('ctf_token',data.token);
+    localStorage.setItem('ctf_team',data.team);
+    localStorage.setItem('ctf_is_admin',data.is_admin);
     window.location.href = data.is_admin ? '/admin' : '/';
-  } else {
-    showAlert(data.message, 'error');
-  }
+  } else { showAlert(data.message,'error'); }
 }
-function showAlert(msg, type) {
+function showAlert(msg,type) {
   document.querySelector('.card').insertAdjacentHTML('afterbegin',
     `<div class="alert alert-${type}">${msg}</div>`);
 }
-document.addEventListener('keydown', e => { if(e.key==='Enter') login(); });
+document.addEventListener('keydown',e=>{if(e.key==='Enter')login();});
 </script></body></html>"""
 
 REGISTER_HTML = """<!DOCTYPE html>
@@ -156,47 +147,45 @@ REGISTER_HTML = """<!DOCTYPE html>
   <a class="logo" href="/">{{ ctf_name }}<span>//</span>CTF</a>
   <nav><a href="/login">LOGIN</a><a href="/register" class="active">REGISTER</a></nav>
 </header>
-<div class="container">
-  <div class="card">
-    <h2>// REGISTER TEAM</h2>
-    <div class="form-group"><label>TEAM NAME</label>
-      <input type="text" id="name" placeholder="your_team_name" maxlength="32"/></div>
-    <div class="form-group"><label>EMAIL</label>
-      <input type="email" id="email" placeholder="team@email.com"/></div>
-    <div class="form-group"><label>PASSWORD</label>
-      <input type="password" id="password" placeholder="min 8 characters"/></div>
-    <div class="form-group"><label>CONFIRM PASSWORD</label>
-      <input type="password" id="confirm" placeholder="repeat password"/></div>
-    <div class="form-group"><label>COUNTRY (optional)</label>
-      <input type="text" id="country" placeholder="India"/></div>
-    <button class="btn btn-full" onclick="register()">CREATE TEAM →</button>
-    <div class="text-center"><a href="/login" class="link">Already registered? Login</a></div>
-  </div>
-</div>
+<div class="container"><div class="card">
+  <h2>// REGISTER TEAM</h2>
+  <div class="form-group"><label>TEAM NAME</label>
+    <input type="text" id="name" placeholder="your_team_name" maxlength="32"/></div>
+  <div class="form-group"><label>EMAIL</label>
+    <input type="email" id="email" placeholder="team@email.com"/></div>
+  <div class="form-group"><label>PASSWORD</label>
+    <input type="password" id="password" placeholder="min 8 characters"/></div>
+  <div class="form-group"><label>CONFIRM PASSWORD</label>
+    <input type="password" id="confirm" placeholder="repeat password"/></div>
+  <div class="form-group"><label>COUNTRY (optional)</label>
+    <input type="text" id="country" placeholder="India"/></div>
+  <button class="btn btn-full" onclick="register()">CREATE TEAM →</button>
+  <div class="text-center"><a href="/login" class="link">Already registered? Login</a></div>
+</div></div>
 <script>
 async function register() {
-  const name = document.getElementById('name').value.trim();
-  const email = document.getElementById('email').value.trim();
-  const password = document.getElementById('password').value;
-  const confirm = document.getElementById('confirm').value;
-  const country = document.getElementById('country').value.trim();
+  const name=document.getElementById('name').value.trim();
+  const email=document.getElementById('email').value.trim();
+  const password=document.getElementById('password').value;
+  const confirm=document.getElementById('confirm').value;
+  const country=document.getElementById('country').value.trim();
   document.querySelectorAll('.alert').forEach(m=>m.remove());
-  if (!name||!email||!password) return showAlert('Fill in all required fields','error');
-  if (password!==confirm) return showAlert('Passwords do not match','error');
-  if (password.length<8) return showAlert('Password must be at least 8 characters','error');
-  const r = await fetch('/api/v1/auth/register', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({team_name:name, email, password, country})
+  if(!name||!email||!password) return showAlert('Fill in all required fields','error');
+  if(password!==confirm) return showAlert('Passwords do not match','error');
+  if(password.length<8) return showAlert('Password must be at least 8 characters','error');
+  const r=await fetch('/api/v1/auth/register',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({team_name:name,email,password,country})
   });
-  const data = await r.json();
-  showAlert(data.message, data.success?'success':'error');
-  if (data.success) setTimeout(()=>window.location.href='/login', 2000);
+  const data=await r.json();
+  showAlert(data.message,data.success?'success':'error');
+  if(data.success) setTimeout(()=>window.location.href='/login',2000);
 }
-function showAlert(msg,type) {
+function showAlert(msg,type){
   document.querySelector('.card').insertAdjacentHTML('afterbegin',
     `<div class="alert alert-${type}">${msg}</div>`);
 }
-document.addEventListener('keydown', e => { if(e.key==='Enter') register(); });
+document.addEventListener('keydown',e=>{if(e.key==='Enter')register();});
 </script></body></html>"""
 
 VERIFY_HTML = """<!DOCTYPE html>
@@ -221,54 +210,46 @@ ADMIN_HTML = """<!DOCTYPE html>
 .tab:last-child{border-right:1px solid var(--border)}
 .tab:hover,.tab.active{color:var(--green);background:rgba(0,255,136,.08)}
 .panel{display:none}.panel.active{display:block}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:2rem}
 </style></head><body>
 <header class="header">
   <a class="logo" href="/">{{ ctf_name }}<span>//</span>CTF</a>
   <nav>
-    <a href="/" >SITE</a>
+    <a href="/">SITE</a>
     <a href="/admin" class="active">ADMIN</a>
     <span style="color:var(--green);margin-left:1.5rem;font-size:.8rem">👑 {{ admin_name }}</span>
     <button onclick="logout()" style="margin-left:1rem;background:none;border:1px solid #4a3a3a;color:#8a6a6a;padding:4px 10px;cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:.75rem;border-radius:2px;">LOGOUT</button>
   </nav>
 </header>
 <div class="wide">
-  <div class="grid-2" style="grid-template-columns:repeat(4,1fr)">
+  <div class="grid-4">
     <div class="stat-card"><div class="stat-value" id="stat-teams">-</div><div class="stat-label">TEAMS</div></div>
     <div class="stat-card"><div class="stat-value" id="stat-challenges">-</div><div class="stat-label">CHALLENGES</div></div>
     <div class="stat-card"><div class="stat-value" id="stat-solves">-</div><div class="stat-label">SOLVES</div></div>
     <div class="stat-card"><div class="stat-value" id="stat-verified">-</div><div class="stat-label">VERIFIED</div></div>
   </div>
-
   <div class="tabs">
     <div class="tab active" onclick="switchTab('teams')" id="tab-teams">TEAMS</div>
     <div class="tab" onclick="switchTab('challenges')" id="tab-challenges">CHALLENGES</div>
     <div class="tab" onclick="switchTab('solves')" id="tab-solves">SOLVE FEED</div>
   </div>
-
   <div class="panel active" id="panel-teams">
     <div class="section-title">// ALL TEAMS</div>
-    <div style="margin-bottom:1rem">
-      <input id="search" placeholder="Search team..." 
-             style="padding:.5rem 1rem;background:var(--card);border:1px solid var(--border);color:#cde;font-family:'Share Tech Mono',monospace;border-radius:2px;width:300px"
-             oninput="filterTeams()"/>
-    </div>
+    <input id="search" placeholder="Search team..."
+           style="padding:.5rem 1rem;background:var(--card);border:1px solid var(--border);color:#cde;font-family:'Share Tech Mono',monospace;border-radius:2px;width:300px;margin-bottom:1rem"
+           oninput="filterTeams()"/>
     <table>
-      <thead><tr>
-        <th>TEAM</th><th>EMAIL</th><th>COUNTRY</th>
-        <th>SCORE</th><th>SOLVES</th><th>STATUS</th><th>ACTIONS</th>
-      </tr></thead>
+      <thead><tr><th>TEAM</th><th>EMAIL</th><th>COUNTRY</th><th>SCORE</th><th>SOLVES</th><th>STATUS</th><th>ACTIONS</th></tr></thead>
       <tbody id="teams-body"></tbody>
     </table>
   </div>
-
   <div class="panel" id="panel-challenges">
     <div class="section-title">// CHALLENGES</div>
     <table>
-      <thead><tr><th>NAME</th><th>CATEGORY</th><th>POINTS</th><th>DIFFICULTY</th><th>SOLVES</th><th>FLAG</th></tr></thead>
+      <thead><tr><th>NAME</th><th>CATEGORY</th><th>POINTS</th><th>DIFFICULTY</th><th>SOLVES</th><th>HINTS</th></tr></thead>
       <tbody id="challenges-body"></tbody>
     </table>
   </div>
-
   <div class="panel" id="panel-solves">
     <div class="section-title">// SOLVE FEED</div>
     <table>
@@ -277,27 +258,23 @@ ADMIN_HTML = """<!DOCTYPE html>
     </table>
   </div>
 </div>
-
 <script>
 const token = localStorage.getItem('ctf_token');
 let allTeams = [];
-
-async function api(path, opts={}) {
-  const headers = {'Content-Type':'application/json','Authorization':`Bearer ${token}`};
-  return (await fetch('/api/v1'+path, {headers,...opts})).json();
+async function api(path,opts={}) {
+  const headers={'Content-Type':'application/json','Authorization':`Bearer ${token}`};
+  return (await fetch('/api/v1'+path,{headers,...opts})).json();
 }
-
 async function loadStats() {
-  const [teams, challenges, feed] = await Promise.all([
+  const [teams,challenges,feed] = await Promise.all([
     api('/admin/teams'), api('/challenges'), api('/feed')
   ]);
-  allTeams = teams.teams || [];
+  allTeams = teams.teams||[];
   document.getElementById('stat-teams').textContent = allTeams.length;
   document.getElementById('stat-challenges').textContent = (challenges.challenges||[]).length;
   document.getElementById('stat-solves').textContent = (feed.events||[]).length;
   document.getElementById('stat-verified').textContent = allTeams.filter(t=>t.verified).length;
   renderTeams(allTeams);
-
   const cb = document.getElementById('challenges-body');
   cb.innerHTML = (challenges.challenges||[]).map(c=>`<tr>
     <td>${c.name}</td>
@@ -305,9 +282,8 @@ async function loadStats() {
     <td style="color:var(--green)">${c.points}</td>
     <td>${c.difficulty}</td>
     <td>${c.solves}</td>
-    <td style="color:#4a8a6a;font-size:.75rem">${c.id}</td>
+    <td style="color:#6a8">${c.hints?.length||0} hints</td>
   </tr>`).join('');
-
   const sb = document.getElementById('solves-body');
   sb.innerHTML = (feed.events||[]).map(e=>`<tr>
     <td style="color:#4a8a6a">${e.timestamp}</td>
@@ -317,10 +293,8 @@ async function loadStats() {
     <td>${e.first_blood?'🩸 YES':''}</td>
   </tr>`).join('');
 }
-
 function renderTeams(teams) {
-  const tbody = document.getElementById('teams-body');
-  tbody.innerHTML = teams.map(t=>`<tr>
+  document.getElementById('teams-body').innerHTML = teams.map(t=>`<tr>
     <td style="color:#eef;font-weight:bold">${t.name}</td>
     <td style="color:#6a8;font-size:.8rem">${t.email}</td>
     <td>${t.country||'-'}</td>
@@ -331,7 +305,7 @@ function renderTeams(teams) {
       ${t.banned?'<span class="badge badge-red" style="margin-left:4px">BANNED</span>':''}
     </td>
     <td>
-      <button class="btn btn-sm ${t.banned?'btn-blue':'btn-red'}" 
+      <button class="btn btn-sm ${t.banned?'btn-blue':'btn-red'}"
               onclick="${t.banned?`unbanTeam('${t.name}')`:`banTeam('${t.name}')`}">
         ${t.banned?'UNBAN':'BAN'}
       </button>
@@ -340,50 +314,42 @@ function renderTeams(teams) {
     </td>
   </tr>`).join('');
 }
-
 function filterTeams() {
   const q = document.getElementById('search').value.toLowerCase();
   renderTeams(allTeams.filter(t=>t.name.toLowerCase().includes(q)||t.email.toLowerCase().includes(q)));
 }
-
 async function banTeam(name) {
-  if (!confirm(`Ban team ${name}?`)) return;
-  await api('/admin/teams/ban', {method:'POST', body:JSON.stringify({team_name:name})});
+  if(!confirm(`Ban team ${name}?`)) return;
+  await api('/admin/teams/ban',{method:'POST',body:JSON.stringify({team_name:name})});
   loadStats();
 }
-
 async function unbanTeam(name) {
-  await api('/admin/teams/unban', {method:'POST', body:JSON.stringify({team_name:name})});
+  await api('/admin/teams/unban',{method:'POST',body:JSON.stringify({team_name:name})});
   loadStats();
 }
-
 async function resetScore(name) {
-  if (!confirm(`Reset score for ${name}?`)) return;
-  await api('/admin/teams/reset', {method:'POST', body:JSON.stringify({team_name:name})});
+  if(!confirm(`Reset score for ${name}?`)) return;
+  await api('/admin/teams/reset',{method:'POST',body:JSON.stringify({team_name:name})});
   loadStats();
 }
-
 async function deleteTeam(name) {
-  if (!confirm(`DELETE team ${name}? This cannot be undone!`)) return;
-  await api('/admin/teams/delete', {method:'POST', body:JSON.stringify({team_name:name})});
+  if(!confirm(`DELETE team ${name}?`)) return;
+  await api('/admin/teams/delete',{method:'POST',body:JSON.stringify({team_name:name})});
   loadStats();
 }
-
 function switchTab(name) {
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
   document.getElementById('panel-'+name).classList.add('active');
 }
-
 function logout() {
   fetch('/api/v1/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}});
   localStorage.clear();
   window.location.href='/login';
 }
-
 loadStats();
-setInterval(loadStats, 30000);
+setInterval(loadStats,30000);
 </script></body></html>"""
 
 INDEX_HTML = """<!DOCTYPE html>
@@ -392,6 +358,7 @@ INDEX_HTML = """<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{ ctf_name }}</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <style>
 """ + BASE_STYLE + """
 .hero{text-align:center;padding:3rem 2rem 1rem}
@@ -421,20 +388,28 @@ INDEX_HTML = """<!DOCTYPE html>
 .tag-insane{background:rgba(255,0,60,.15);color:var(--red);border:1px solid rgba(255,0,60,.3)}
 .ch-desc{font-size:.78rem;color:#7a9a8a;margin-top:.5rem;line-height:1.5}
 .ch-solves{font-size:.75rem;color:#6a8;margin-top:.5rem}
+.ch-hints{font-size:.7rem;color:#4a7a9a;margin-top:.25rem}
 .solved-badge{position:absolute;top:.75rem;right:.75rem;background:rgba(0,255,136,.15);border:1px solid rgba(0,255,136,.3);color:var(--green);font-size:.65rem;padding:2px 6px;border-radius:2px}
-.scoreboard-table table{width:100%;border-collapse:collapse}
 .modal-overlay{position:fixed;inset:0;background:rgba(5,10,15,.92);display:none;align-items:center;justify-content:center;z-index:1000}
 .modal-overlay.active{display:flex}
-.modal{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:2rem;max-width:520px;width:90%}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:2rem;max-width:560px;width:90%;max-height:90vh;overflow-y:auto}
 .modal h2{font-family:'Orbitron',sans-serif;color:var(--green);margin-bottom:.5rem}
-.modal-desc{color:#6a8;margin-bottom:1.5rem;line-height:1.7;font-size:.85rem}
+.modal-desc{color:#6a8;margin-bottom:1rem;line-height:1.7;font-size:.85rem}
 .flag-input{width:100%;padding:.75rem 1rem;background:var(--bg);border:1px solid var(--border);color:var(--green);font-family:'Share Tech Mono',monospace;font-size:.95rem;border-radius:2px;outline:none;transition:border-color .2s}
 .flag-input:focus{border-color:var(--green)}
 .flag-input::placeholder{color:#3a5a4a}
-.btn-row{display:flex;gap:.75rem;margin-top:1rem}
+.btn-row{display:flex;gap:.75rem;margin-top:1rem;flex-wrap:wrap}
 .result-msg{margin-top:1rem;padding:.75rem;border-radius:2px;font-size:.9rem;display:none}
 .result-msg.correct{background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.3);color:var(--green)}
 .result-msg.wrong{background:rgba(255,0,60,.1);border:1px solid rgba(255,0,60,.3);color:var(--red)}
+.hints-section{margin-top:1.5rem;border-top:1px solid var(--border);padding-top:1rem}
+.hints-title{font-size:.75rem;color:#6a8;letter-spacing:.15em;margin-bottom:.75rem}
+.hint-item{background:var(--bg);border:1px solid var(--border);border-radius:2px;padding:.75rem;margin-bottom:.5rem;font-size:.85rem}
+.hint-locked{display:flex;justify-content:space-between;align-items:center}
+.hint-cost{color:var(--red);font-size:.75rem}
+.hint-text{color:#8ab;line-height:1.6}
+.hint-unlock-btn{padding:.35rem .75rem;font-family:'Share Tech Mono',monospace;font-size:.75rem;border:1px solid var(--red);background:transparent;color:var(--red);cursor:pointer;border-radius:2px;transition:background .2s}
+.hint-unlock-btn:hover{background:rgba(255,0,60,.1)}
 .tabs{display:flex;margin-bottom:2rem}
 .tab{padding:.75rem 1.5rem;cursor:pointer;border:1px solid var(--border);border-right:none;font-size:.8rem;letter-spacing:.1em;color:#6a8;transition:all .2s}
 .tab:last-child{border-right:1px solid var(--border)}
@@ -451,17 +426,19 @@ INDEX_HTML = """<!DOCTYPE html>
 .logout-btn:hover{color:var(--red);border-color:var(--red)}
 .login-prompt{background:rgba(0,212,255,.05);border:1px solid rgba(0,212,255,.2);border-radius:4px;padding:1.5rem;text-align:center;margin-bottom:2rem}
 .login-prompt p{color:#6a8;margin-bottom:1rem;font-size:.9rem}
-.login-prompt a{color:var(--green);text-decoration:none;border:1px solid var(--green);padding:.5rem 1.5rem;border-radius:2px;margin:0 .5rem;font-size:.85rem;transition:background .2s}
+.login-prompt a{color:var(--green);text-decoration:none;border:1px solid var(--green);padding:.5rem 1.5rem;border-radius:2px;margin:0 .5rem;font-size:.85rem}
 .login-prompt a:hover{background:rgba(0,255,136,.1)}
-.cert-btn{background:none;border:1px solid var(--blue);color:var(--blue);padding:.5rem 1rem;font-family:'Share Tech Mono',monospace;font-size:.8rem;cursor:pointer;border-radius:2px;transition:background .2s}
+.cert-btn{background:none;border:1px solid var(--blue);color:var(--blue);padding:.4rem .8rem;font-family:'Share Tech Mono',monospace;font-size:.75rem;cursor:pointer;border-radius:2px;transition:background .2s}
 .cert-btn:hover{background:rgba(0,212,255,.1)}
+.graph-container{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:1.5rem;margin-bottom:2rem}
+.graph-title{font-family:'Orbitron',sans-serif;font-size:.85rem;color:var(--green);letter-spacing:.15em;margin-bottom:1rem}
 </style>
 </head>
 <body>
 <header class="header">
   <a class="logo" href="/">{{ ctf_name }}<span>//</span>CTF</a>
   <nav>
-    <a href="#" onclick="switchTab('challenges')" >CHALLENGES</a>
+    <a href="#" onclick="switchTab('challenges')">CHALLENGES</a>
     <a href="#" onclick="switchTab('scoreboard')">SCOREBOARD</a>
     <a href="#" onclick="switchTab('feed')">LIVE FEED</a>
     <div class="user-bar" id="user-bar" style="display:none">
@@ -500,17 +477,21 @@ INDEX_HTML = """<!DOCTYPE html>
   <div class="panel active" id="panel-challenges">
     <div class="section-title">// CHALLENGES</div>
     <div id="login-prompt-box"></div>
-    <div class="challenges-grid" id="challenges-grid"><div style="color:#4a8a6a;padding:2rem;">Loading...</div></div>
+    <div class="challenges-grid" id="challenges-grid">
+      <div style="color:#4a8a6a;padding:2rem;">Loading...</div>
+    </div>
   </div>
 
   <div class="panel" id="panel-scoreboard">
     <div class="section-title">// SCOREBOARD</div>
-    <div class="scoreboard-table">
-      <table>
-        <thead><tr><th>RANK</th><th>TEAM</th><th>SCORE</th><th>SOLVES</th><th>LAST SOLVE</th><th></th></tr></thead>
-        <tbody id="scoreboard-body"></tbody>
-      </table>
+    <div class="graph-container">
+      <div class="graph-title">// SCORE PROGRESSION</div>
+      <canvas id="scoreGraph" height="120"></canvas>
     </div>
+    <table>
+      <thead><tr><th>RANK</th><th>TEAM</th><th>SCORE</th><th>SOLVES</th><th>LAST SOLVE</th><th></th></tr></thead>
+      <tbody id="scoreboard-body"></tbody>
+    </table>
   </div>
 
   <div class="panel" id="panel-feed">
@@ -529,11 +510,13 @@ INDEX_HTML = """<!DOCTYPE html>
       <button class="btn btn-red" onclick="closeModal()">CANCEL</button>
     </div>
     <div class="result-msg" id="result-msg"></div>
+    <div class="hints-section" id="hints-section"></div>
   </div>
 </div>
 
 <script>
 let currentChallenge = null;
+let scoreChart = null;
 const token = localStorage.getItem('ctf_token');
 const team = localStorage.getItem('ctf_team');
 const isAdmin = localStorage.getItem('ctf_is_admin') === 'true';
@@ -572,7 +555,10 @@ async function loadChallenges() {
 
   document.getElementById('stat-challenges').textContent = data.challenges.length;
   const grouped = {};
-  data.challenges.forEach(ch => { if(!grouped[ch.category]) grouped[ch.category]=[]; grouped[ch.category].push(ch); });
+  data.challenges.forEach(ch => {
+    if (!grouped[ch.category]) grouped[ch.category] = [];
+    grouped[ch.category].push(ch);
+  });
   grid.innerHTML = '';
 
   Object.entries(grouped).sort().forEach(([cat, chs]) => {
@@ -586,11 +572,18 @@ async function loadChallenges() {
       card.className = 'challenge-card';
       if (solved) card.style.borderColor = 'rgba(0,255,136,.4)';
       card.innerHTML = `
-        ${solved?'<div class="solved-badge">✓ SOLVED</div>':''}
-        <div class="ch-header"><div class="ch-name">${ch.name}</div><div class="ch-points">${ch.points}pts</div></div>
-        <div class="ch-meta"><span class="tag tag-cat">${ch.category}</span><span class="tag tag-${ch.difficulty}">${ch.difficulty}</span></div>
+        ${solved ? '<div class="solved-badge">✓ SOLVED</div>' : ''}
+        <div class="ch-header">
+          <div class="ch-name">${ch.name}</div>
+          <div class="ch-points">${ch.points}pts</div>
+        </div>
+        <div class="ch-meta">
+          <span class="tag tag-cat">${ch.category}</span>
+          <span class="tag tag-${ch.difficulty}">${ch.difficulty}</span>
+        </div>
         <div class="ch-desc">${ch.description||''}</div>
-        <div class="ch-solves">${ch.solves} solve${ch.solves!==1?'s':''}</div>`;
+        <div class="ch-solves">${ch.solves} solve${ch.solves!==1?'s':''}</div>
+        ${ch.hints?.length ? `<div class="ch-hints">💡 ${ch.hints.length} hints available</div>` : ''}`;
       card.onclick = () => token ? openModal(ch) : window.location.href='/login';
       grid.appendChild(card);
     });
@@ -600,7 +593,6 @@ async function loadChallenges() {
 async function loadScoreboard() {
   const data = await api('/scoreboard');
   const ranks = ['🥇','🥈','🥉'];
-  const cls = ['rank-gold','rank-silver','rank-bronze'];
   document.getElementById('stat-teams').textContent = data.scores?.length||0;
   const tbody = document.getElementById('scoreboard-body');
   if (!data.scores?.length) {
@@ -615,6 +607,65 @@ async function loadScoreboard() {
     <td style="color:#4a8a6a;font-size:.8rem">${e.last_solve}</td>
     <td><button class="cert-btn" onclick="getCertificate('${e.team}','${i+1}')">🏆 CERT</button></td>
   </tr>`).join('');
+
+  // Draw graph
+  await drawScoreGraph(data.scores.slice(0,5));
+}
+
+async function drawScoreGraph(topTeams) {
+  const timelines = await Promise.all(
+    topTeams.map(t => api(`/scoreboard/timeline?team=${encodeURIComponent(t.team)}`))
+  );
+
+  const colors = ['#00ff88','#00d4ff','#ff003c','#ffb800','#aa00ff'];
+  const datasets = topTeams.map((t,i) => {
+    const tl = timelines[i].timeline||[];
+    return {
+      label: t.team,
+      data: tl.map(p=>({x:p.time*1000, y:p.total})),
+      borderColor: colors[i],
+      backgroundColor: colors[i]+'22',
+      borderWidth: 2,
+      pointRadius: 3,
+      tension: 0.3,
+      fill: false,
+    };
+  });
+
+  const ctx = document.getElementById('scoreGraph').getContext('2d');
+  if (scoreChart) scoreChart.destroy();
+  scoreChart = new Chart(ctx, {
+    type: 'line',
+    data: { datasets },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          labels: { color: '#6a8', font: { family: 'Share Tech Mono' }, boxWidth: 12 }
+        },
+        tooltip: {
+          backgroundColor: '#0a1520',
+          borderColor: '#1a3a4a',
+          borderWidth: 1,
+          titleColor: '#00ff88',
+          bodyColor: '#cde',
+        }
+      },
+      scales: {
+        x: {
+          type: 'time',
+          time: { unit: 'hour' },
+          ticks: { color: '#4a8a6a', font: { family: 'Share Tech Mono', size: 10 } },
+          grid: { color: 'rgba(26,58,74,.5)' }
+        },
+        y: {
+          ticks: { color: '#4a8a6a', font: { family: 'Share Tech Mono', size: 10 } },
+          grid: { color: 'rgba(26,58,74,.5)' }
+        }
+      }
+    }
+  });
 }
 
 async function loadFeed() {
@@ -636,18 +687,62 @@ async function loadFeed() {
     </div>`).join('');
 }
 
-function getCertificate(teamName, rank) {
-  window.open(`/certificate/${teamName}?rank=${rank}`, '_blank');
-}
-
-function openModal(ch) {
+async function openModal(ch) {
   currentChallenge = ch;
   document.getElementById('modal-title').textContent = ch.name;
   document.getElementById('modal-desc').textContent = ch.description||'Find the flag!';
   document.getElementById('flag-input').value = '';
   document.getElementById('result-msg').style.display = 'none';
+
+  // Load hints
+  await loadHints(ch);
+
   document.getElementById('modal').classList.add('active');
   setTimeout(()=>document.getElementById('flag-input').focus(),100);
+}
+
+async function loadHints(ch) {
+  const section = document.getElementById('hints-section');
+  if (!ch.hints?.length) { section.innerHTML = ''; return; }
+
+  const unlocked = token ? await api(`/hints/${ch.id}`) : {unlocked:[]};
+  const unlockedSet = new Set((unlocked.unlocked||[]).map(h=>h.hint_index));
+
+  section.innerHTML = `<div class="hints-title">💡 HINTS (${ch.hints.length} available)</div>` +
+    ch.hints.map((hint, i) => {
+      const cost = Math.floor(ch.points * 0.1 * (i + 1));
+      if (unlockedSet.has(i)) {
+        return `<div class="hint-item">
+          <div style="font-size:.7rem;color:#4a8a6a;margin-bottom:.35rem">HINT ${i+1} — UNLOCKED</div>
+          <div class="hint-text">${hint}</div>
+        </div>`;
+      }
+      return `<div class="hint-item">
+        <div class="hint-locked">
+          <span style="font-size:.8rem;color:#6a8">Hint ${i+1}</span>
+          <div style="display:flex;align-items:center;gap:.75rem">
+            <span class="hint-cost">-${cost} pts</span>
+            <button class="hint-unlock-btn" onclick="unlockHint('${ch.id}',${i},${cost})">
+              UNLOCK
+            </button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+}
+
+async function unlockHint(challengeId, hintIndex, cost) {
+  if (!token) return window.location.href='/login';
+  if (!confirm(`Unlock hint for -${cost} points?`)) return;
+  const r = await api('/hints/unlock', {
+    method: 'POST',
+    body: JSON.stringify({challenge_id: challengeId, hint_index: hintIndex})
+  });
+  if (r.success) {
+    await loadHints(currentChallenge);
+  } else {
+    alert(r.message||'Failed to unlock hint');
+  }
 }
 
 function closeModal() {
@@ -659,8 +754,9 @@ async function submitFlag() {
   if (!currentChallenge) return;
   const flag = document.getElementById('flag-input').value.trim();
   if (!flag) return;
-  const r = await fetch('/api/v1/submit',{
-    method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},
+  const r = await fetch('/api/v1/submit', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},
     body: JSON.stringify({challenge_id:currentChallenge.id, flag, team})
   });
   const data = await r.json();
@@ -671,13 +767,17 @@ async function submitFlag() {
   if (data.correct) setTimeout(()=>{closeModal();loadChallenges();loadScoreboard();loadFeed();},1800);
 }
 
+function getCertificate(teamName, rank) {
+  window.open(`/certificate/${teamName}?rank=${rank}`, '_blank');
+}
+
 function switchTab(name) {
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
   document.getElementById('panel-'+name).classList.add('active');
-  if(name==='scoreboard') loadScoreboard();
-  if(name==='feed') loadFeed();
+  if (name==='scoreboard') loadScoreboard();
+  if (name==='feed') loadFeed();
 }
 
 function logout() {
@@ -700,64 +800,50 @@ setInterval(()=>{loadScoreboard();loadFeed();},30000);
 CERT_HTML = """<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Certificate - {{ team }}</title>
+<meta charset="UTF-8"><title>Certificate - {{ team }}</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#050a0f;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:2rem;font-family:'Share Tech Mono',monospace}
-.cert{background:linear-gradient(135deg,#0a1520,#050a0f);border:2px solid #00ff88;border-radius:8px;padding:4rem;max-width:800px;width:100%;text-align:center;position:relative;overflow:hidden}
+.cert{background:linear-gradient(135deg,#0a1520,#050a0f);border:2px solid #00ff88;border-radius:8px;padding:4rem;max-width:800px;width:100%;text-align:center;position:relative}
 .cert::before{content:'';position:absolute;inset:8px;border:1px solid rgba(0,255,136,.3);border-radius:4px;pointer-events:none}
-.cert::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(45deg,transparent,transparent 10px,rgba(0,255,136,.02) 10px,rgba(0,255,136,.02) 11px);pointer-events:none}
 .corner{position:absolute;width:20px;height:20px;border-color:#00ff88;border-style:solid}
 .corner-tl{top:16px;left:16px;border-width:2px 0 0 2px}
 .corner-tr{top:16px;right:16px;border-width:2px 2px 0 0}
 .corner-bl{bottom:16px;left:16px;border-width:0 0 2px 2px}
 .corner-br{bottom:16px;right:16px;border-width:0 2px 2px 0}
 .cert-logo{font-family:'Orbitron',sans-serif;font-size:1rem;color:rgba(0,255,136,.5);letter-spacing:.3em;margin-bottom:2rem}
-.cert-title{font-family:'Orbitron',sans-serif;font-size:2.5rem;font-weight:900;color:#00ff88;text-shadow:0 0 30px rgba(0,255,136,.5);margin-bottom:.5rem}
+.cert-title{font-family:'Orbitron',sans-serif;font-size:2.5rem;font-weight:900;color:#00ff88;margin-bottom:.5rem}
 .cert-subtitle{color:rgba(0,212,255,.7);font-size:.9rem;letter-spacing:.2em;margin-bottom:3rem}
 .cert-text{color:#6a8;font-size:.9rem;margin-bottom:.75rem;letter-spacing:.05em}
-.cert-name{font-family:'Orbitron',sans-serif;font-size:2rem;font-weight:700;color:#fff;text-shadow:0 0 20px rgba(255,255,255,.3);margin:1rem 0;padding:.75rem 2rem;border:1px solid rgba(0,255,136,.4);display:inline-block;background:rgba(0,255,136,.05);border-radius:4px}
-.cert-rank{font-family:'Orbitron',sans-serif;font-size:3rem;color:#ffd700;text-shadow:0 0 20px rgba(255,215,0,.5);margin:1rem 0}
+.cert-name{font-family:'Orbitron',sans-serif;font-size:2rem;font-weight:700;color:#fff;margin:1rem 0;padding:.75rem 2rem;border:1px solid rgba(0,255,136,.4);display:inline-block;background:rgba(0,255,136,.05);border-radius:4px}
+.cert-rank{font-family:'Orbitron',sans-serif;font-size:3rem;color:#ffd700;margin:1rem 0}
 .cert-details{display:flex;justify-content:center;gap:3rem;margin:2rem 0;padding:1.5rem;border-top:1px solid rgba(26,58,74,.8);border-bottom:1px solid rgba(26,58,74,.8)}
-.cert-detail{text-align:center}
 .cert-detail-value{font-family:'Orbitron',sans-serif;font-size:1.5rem;color:#00ff88}
 .cert-detail-label{font-size:.7rem;color:#4a8a6a;letter-spacing:.15em;margin-top:.25rem}
 .cert-footer{margin-top:2rem;color:#4a6a5a;font-size:.75rem;letter-spacing:.1em}
 .cert-id{color:#2a4a3a;font-size:.65rem;margin-top:.5rem}
-.print-btn{margin-top:2rem;padding:.75rem 2rem;background:transparent;border:1px solid #00ff88;color:#00ff88;font-family:'Share Tech Mono',monospace;font-size:.85rem;cursor:pointer;border-radius:2px;letter-spacing:.1em;transition:background .2s}
+.print-btn{margin-top:2rem;padding:.75rem 2rem;background:transparent;border:1px solid #00ff88;color:#00ff88;font-family:'Share Tech Mono',monospace;font-size:.85rem;cursor:pointer;border-radius:2px;letter-spacing:.1em}
 .print-btn:hover{background:rgba(0,255,136,.1)}
-@media print{.print-btn{display:none}body{background:#fff}.cert{border-color:#000;background:#fff}.cert-title{color:#000;text-shadow:none}.cert-name{color:#000;border-color:#000}.cert-rank{color:#c0a000}.cert-details{border-color:#ccc}.cert-logo,.cert-subtitle,.cert-text,.cert-footer{color:#666}}
+@media print{.print-btn{display:none}}
 </style>
 </head>
 <body>
 <div class="cert">
-  <div class="corner corner-tl"></div>
-  <div class="corner corner-tr"></div>
-  <div class="corner corner-bl"></div>
-  <div class="corner corner-br"></div>
+  <div class="corner corner-tl"></div><div class="corner corner-tr"></div>
+  <div class="corner corner-bl"></div><div class="corner corner-br"></div>
   <div class="cert-logo">{{ ctf_name | upper }} // CTF</div>
   <div class="cert-title">CERTIFICATE</div>
   <div class="cert-subtitle">OF ACHIEVEMENT</div>
   <div class="cert-text">This certifies that</div>
   <div class="cert-name">{{ team }}</div>
   <div class="cert-text">has successfully competed in</div>
-  <div class="cert-text" style="color:#00ff88;font-size:1.1rem;letter-spacing:.1em">{{ ctf_name }}</div>
+  <div class="cert-text" style="color:#00ff88;font-size:1.1rem">{{ ctf_name }}</div>
   <div class="cert-rank">{{ rank_emoji }} #{{ rank }}</div>
   <div class="cert-details">
-    <div class="cert-detail">
-      <div class="cert-detail-value">{{ score }}</div>
-      <div class="cert-detail-label">POINTS</div>
-    </div>
-    <div class="cert-detail">
-      <div class="cert-detail-value">{{ solves }}</div>
-      <div class="cert-detail-label">SOLVES</div>
-    </div>
-    <div class="cert-detail">
-      <div class="cert-detail-value">{{ rank }}</div>
-      <div class="cert-detail-label">RANK</div>
-    </div>
+    <div class="cert-detail"><div class="cert-detail-value">{{ score }}</div><div class="cert-detail-label">POINTS</div></div>
+    <div class="cert-detail"><div class="cert-detail-value">{{ solves }}</div><div class="cert-detail-label">SOLVES</div></div>
+    <div class="cert-detail"><div class="cert-detail-value">{{ rank }}</div><div class="cert-detail-label">RANK</div></div>
   </div>
   <div class="cert-footer">{{ ctf_name }} — {{ date }}</div>
   <div class="cert-id">Certificate ID: {{ cert_id }}</div>
@@ -806,7 +892,7 @@ def create_app(config: Config = None) -> Flask:
             return f(*args, **kwargs)
         return wrapper
 
-    # ── Page Routes ──────────────────────────────────────────────────────
+    # ── Pages ──────────────────────────────────────────────────────────
     @app.route("/")
     def index():
         return render_template_string(INDEX_HTML,
@@ -844,29 +930,20 @@ def create_app(config: Config = None) -> Flask:
         from datetime import datetime
         rank = int(request.args.get("rank", 1))
         info = auth.get_team_info(team_name)
-        if not info:
-            scores = scoreboard.get_top(100)
-            score = next((s.score for s in scores if s.team == team_name), 0)
-            solves = next((s.solves for s in scores if s.team == team_name), 0)
-        else:
-            score = info.get("score", 0)
-            solves = info.get("solves", 0)
-
-        rank_emojis = {1: "🥇", 2: "🥈", 3: "🥉"}
-        rank_emoji = rank_emojis.get(rank, "🏅")
-        cert_id = hashlib.md5(f"{team_name}{rank}{config.ctf_name}".encode()).hexdigest()[:12].upper()
-
+        score = info.get("score", 0) if info else 0
+        solves = info.get("solves", 0) if info else 0
+        rank_emojis = {1:"🥇",2:"🥈",3:"🥉"}
+        cert_id = hashlib.md5(
+            f"{team_name}{rank}{config.ctf_name}".encode()
+        ).hexdigest()[:12].upper()
         return render_template_string(CERT_HTML,
-            ctf_name=config.ctf_name,
-            team=team_name,
-            rank=rank,
-            rank_emoji=rank_emoji,
-            score=score,
-            solves=solves,
+            ctf_name=config.ctf_name, team=team_name,
+            rank=rank, rank_emoji=rank_emojis.get(rank,"🏅"),
+            score=score, solves=solves,
             date=datetime.now().strftime("%B %d, %Y"),
             cert_id=cert_id)
 
-    # ── Auth API ─────────────────────────────────────────────────────────
+    # ── Auth API ───────────────────────────────────────────────────────
     @app.route("/api/v1/auth/register", methods=["POST"])
     @require_json
     def api_register():
@@ -906,15 +983,21 @@ def create_app(config: Config = None) -> Flask:
         result = auth.resend_verification(d.get("email","").strip().lower())
         return jsonify({"success": result.success, "message": result.message})
 
-    # ── Challenge API ─────────────────────────────────────────────────────
+    # ── Challenges API ─────────────────────────────────────────────────
     @app.route("/api/v1/challenges")
     def api_challenges():
-        return jsonify({"challenges": [
-            {"id": c.id, "name": c.name, "category": c.category,
-             "points": c.points, "difficulty": c.difficulty,
-             "description": c.description, "solves": c.solves}
-            for c in manager.list_challenges()
-        ]})
+        import json
+        challenges = manager.list_challenges()
+        result = []
+        for c in challenges:
+            hints = c.hints if isinstance(c.hints, list) else []
+            result.append({
+                "id": c.id, "name": c.name, "category": c.category,
+                "points": c.points, "difficulty": c.difficulty,
+                "description": c.description, "solves": c.solves,
+                "hints": [None] * len(hints)  # Don't expose hint text
+            })
+        return jsonify({"challenges": result})
 
     @app.route("/api/v1/submit", methods=["POST"])
     @require_json
@@ -930,6 +1013,73 @@ def create_app(config: Config = None) -> Flask:
         return jsonify({"correct": result.correct, "points": result.points,
                         "message": result.message, "hint": result.hint})
 
+    # ── Hints API ──────────────────────────────────────────────────────
+    @app.route("/api/v1/hints/<challenge_id>")
+    @require_auth
+    def api_get_hints(challenge_id):
+        team = get_current_team()
+        rows = manager.db.fetchall(
+            "SELECT hint_index, cost FROM hint_unlocks WHERE team=? AND challenge_id=?",
+            (team, challenge_id)
+        )
+        challenge = manager.get_challenge(challenge_id)
+        if not challenge:
+            return jsonify({"unlocked": []})
+        unlocked = []
+        for row in rows:
+            idx = row[0]
+            if idx < len(challenge.hints):
+                unlocked.append({
+                    "hint_index": idx,
+                    "cost": row[1],
+                    "text": challenge.hints[idx]
+                })
+        return jsonify({"unlocked": unlocked})
+
+    @app.route("/api/v1/hints/unlock", methods=["POST"])
+    @require_json
+    @require_auth
+    def api_unlock_hint():
+        team = get_current_team()
+        d = request.get_json()
+        challenge_id = d.get("challenge_id","")
+        hint_index = int(d.get("hint_index", 0))
+
+        challenge = manager.get_challenge(challenge_id)
+        if not challenge:
+            return jsonify({"success": False, "message": "Challenge not found"})
+        if hint_index >= len(challenge.hints):
+            return jsonify({"success": False, "message": "Hint not found"})
+
+        # Check already unlocked
+        existing = manager.db.fetchone(
+            "SELECT id FROM hint_unlocks WHERE team=? AND challenge_id=? AND hint_index=?",
+            (team, challenge_id, hint_index)
+        )
+        if existing:
+            return jsonify({"success": True, "message": "Already unlocked"})
+
+        # Deduct points
+        cost = int(challenge.points * 0.1 * (hint_index + 1))
+        team_info = auth.get_team_info(team)
+        if not team_info:
+            return jsonify({"success": False, "message": "Team not found"})
+        if team_info["score"] < cost:
+            return jsonify({"success": False, "message": f"Not enough points! Need {cost} pts"})
+
+        # Deduct from score
+        manager.db.execute(
+            "UPDATE teams SET score = score - ? WHERE name=?", (cost, team)
+        )
+        # Record unlock
+        manager.db.execute(
+            "INSERT INTO hint_unlocks (team, challenge_id, hint_index, cost) VALUES (?,?,?,?)",
+            (team, challenge_id, hint_index, cost)
+        )
+        return jsonify({"success": True, "message": f"Hint unlocked! -{cost} pts",
+                        "text": challenge.hints[hint_index]})
+
+    # ── Scoreboard API ─────────────────────────────────────────────────
     @app.route("/api/v1/scoreboard")
     def api_scoreboard():
         n = min(int(request.args.get("top", 50)), 100)
@@ -939,12 +1089,18 @@ def create_app(config: Config = None) -> Flask:
             for e in scoreboard.get_top(n)
         ]})
 
+    @app.route("/api/v1/scoreboard/timeline")
+    def api_timeline():
+        team = request.args.get("team","")
+        timeline = scoreboard.get_score_timeline(team)
+        return jsonify({"timeline": timeline})
+
     @app.route("/api/v1/feed")
     def api_feed():
         return jsonify({"events": [
-            {"team": e.team, "challenge": e.challenge, "category": e.category,
-             "points": e.points, "timestamp": e.timestamp,
-             "first_blood": e.first_blood}
+            {"team": e.team, "challenge": e.challenge,
+             "category": e.category, "points": e.points,
+             "timestamp": e.timestamp, "first_blood": e.first_blood}
             for e in scoreboard.get_solve_feed()
         ]})
 
@@ -952,8 +1108,7 @@ def create_app(config: Config = None) -> Flask:
     @require_auth
     def api_me():
         team = get_current_team()
-        info = auth.get_team_info(team)
-        return jsonify({"team": info})
+        return jsonify({"team": auth.get_team_info(team)})
 
     @app.route("/api/v1/me/solves")
     def api_me_solves():
@@ -966,7 +1121,7 @@ def create_app(config: Config = None) -> Flask:
              "first_blood": bool(r[2])} for r in solves
         ]})
 
-    # ── Admin API ─────────────────────────────────────────────────────────
+    # ── Admin API ──────────────────────────────────────────────────────
     @app.route("/api/v1/admin/teams")
     @require_admin
     def api_admin_teams():
@@ -975,33 +1130,29 @@ def create_app(config: Config = None) -> Flask:
     @app.route("/api/v1/admin/teams/ban", methods=["POST"])
     @require_admin
     @require_json
-    def api_ban_team():
-        d = request.get_json()
-        auth.ban_team(d.get("team_name",""))
+    def api_ban():
+        auth.ban_team(request.get_json().get("team_name",""))
         return jsonify({"success": True})
 
     @app.route("/api/v1/admin/teams/unban", methods=["POST"])
     @require_admin
     @require_json
-    def api_unban_team():
-        d = request.get_json()
-        auth.unban_team(d.get("team_name",""))
+    def api_unban():
+        auth.unban_team(request.get_json().get("team_name",""))
         return jsonify({"success": True})
 
     @app.route("/api/v1/admin/teams/delete", methods=["POST"])
     @require_admin
     @require_json
-    def api_delete_team():
-        d = request.get_json()
-        auth.delete_team(d.get("team_name",""))
+    def api_delete():
+        auth.delete_team(request.get_json().get("team_name",""))
         return jsonify({"success": True})
 
     @app.route("/api/v1/admin/teams/reset", methods=["POST"])
     @require_admin
     @require_json
-    def api_reset_team():
-        d = request.get_json()
-        auth.reset_team_score(d.get("team_name",""))
+    def api_reset():
+        auth.reset_team_score(request.get_json().get("team_name",""))
         return jsonify({"success": True})
 
     @app.errorhandler(404)
@@ -1012,28 +1163,58 @@ def create_app(config: Config = None) -> Flask:
 
     # Auto seed
     def auto_seed():
-        import os
+        import os, json
         os.makedirs("challenges", exist_ok=True)
-        for cat in ["web","pwn","crypto","forensics","reverse","misc"]:
+        for cat in ["web","pwn","crypto","forensics","reverse","misc","osint","network"]:
             os.makedirs(f"challenges/{cat}", exist_ok=True)
         try:
             existing = manager.list_challenges()
             if len(existing) >= 1:
                 return
             challenges = [
-                ("web","SQL Injection 101",100,"easy","A login form is hiding something. Can you bypass authentication and retrieve the admin flag?"),
-                ("web","JWT Bypass",200,"medium","This API uses JSON Web Tokens for authentication. The dev made a classic mistake."),
-                ("crypto","Broken RSA",200,"medium","We intercepted an RSA-encrypted message. The developer reused primes across two public keys."),
-                ("pwn","Buffer Overflow",300,"hard","A vulnerable C binary is running on the server. Overflow the buffer and hijack execution."),
-                ("reverse","Crack Me",150,"easy","A Python binary checks your input against a secret key using XOR encoding. Reverse it!"),
-                ("forensics","Hidden Message",250,"hard","We captured a suspicious image file. Something is hidden inside."),
+                ("web","SQL Injection 101",100,"easy",
+                 "A login form is hiding something. Can you bypass authentication?",
+                 ["Try adding a single quote to the input","Look up SQL injection login bypass payloads"]),
+                ("web","JWT Bypass",200,"medium",
+                 "This API uses JSON Web Tokens. The dev made a classic mistake.",
+                 ["Check the algorithm field in the JWT header","Try changing the algorithm to 'none'"]),
+                ("web","XSS Attack",150,"medium",
+                 "A comment section reflects user input directly. Inject a script!",
+                 ["Try a basic <script>alert(1)</script>","Look for ways to steal document.cookie"]),
+                ("crypto","Broken RSA",200,"medium",
+                 "We intercepted an RSA-encrypted message. The developer reused primes.",
+                 ["Try computing GCD of the two moduli","Use the common factor to factor both keys"]),
+                ("crypto","Caesar's Secret",100,"easy",
+                 "An ancient encryption method was used. Shift your thinking!",
+                 ["Try all 26 possible shifts","Look for a shift that gives readable English"]),
+                ("pwn","Buffer Overflow",300,"hard",
+                 "A vulnerable C binary is running. Overflow the buffer and hijack execution.",
+                 ["Use cyclic pattern to find the offset","Check for a win() function in the binary"]),
+                ("reverse","Crack Me",150,"easy",
+                 "A Python binary checks your input against a secret key using XOR.",
+                 ["XOR is reversible - apply the same key twice","Try XORing each byte with 0x42"]),
+                ("forensics","Hidden Message",250,"hard",
+                 "We captured a suspicious image file. Something is hidden inside.",
+                 ["Try running strings on the file","Check for steganography tools like steghide"]),
+                ("osint","Find The Hacker",200,"medium",
+                 "A hacker left traces across the internet. Track them down.",
+                 ["Check common social media platforms","Try searching their username across multiple sites"]),
+                ("misc","Base Madness",100,"easy",
+                 "This string has been encoded multiple times. Decode it layer by layer.",
+                 ["Start with base64 decoding","Try base64 then base32 then hex"]),
+                ("network","Packet Secrets",250,"hard",
+                 "We captured network traffic during a suspicious transfer. Analyze the pcap.",
+                 ["Open in Wireshark and filter by protocol","Follow the TCP stream to see the full data"]),
             ]
-            for category, name, points, difficulty, desc in challenges:
+            for category, name, points, difficulty, desc, hints in challenges:
                 ch = manager.create_challenge(category, name, points, difficulty, description=desc)
+                manager.db.execute(
+                    "UPDATE challenges SET hints=? WHERE id=?",
+                    (json.dumps(hints), ch.id)
+                )
                 print(f"[SEED] ✅ {ch.name} — {ch.flag}")
         except Exception as e:
             print(f"[SEED] Error: {e}")
 
     auto_seed()
-
     return app
