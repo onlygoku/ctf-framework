@@ -320,11 +320,11 @@ services:
 
     def _row_to_challenge(self, row) -> Challenge:
         cols = ["id","name","category","points","difficulty","description","flag",
-                "author","solves","hints","files","tags","docker_enabled","created_at","path"]
+            "author","solves","hints","files","tags","docker_enabled","created_at","path"]
         data = dict(zip(cols, row))
-        data["hints"] = json.loads(data["hints"])
-        data["files"] = json.loads(data["files"])
-        data["tags"] = json.loads(data["tags"])
+        data["hints"] = json.loads(data["hints"]) if isinstance(data["hints"], str) else (data["hints"] or [])
+        data["files"] = json.loads(data["files"]) if isinstance(data["files"], str) else (data["files"] or [])
+        data["tags"] = json.loads(data["tags"]) if isinstance(data["tags"], str) else (data["tags"] or [])
         data["docker_enabled"] = bool(data["docker_enabled"])
         return Challenge(**data)
 
