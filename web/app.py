@@ -1,5 +1,5 @@
 """
-Web App - CTF Platform with Hint System and Graph Scoreboard
+Web App - CTF Platform with Hint System, Graph Scoreboard, and Admin Panel
 """
 
 import sys
@@ -260,10 +260,16 @@ ADMIN_HTML = """<!DOCTYPE html>
 </div>
 <script>
 const token = localStorage.getItem('ctf_token');
+const isAdmin = localStorage.getItem('ctf_is_admin') === 'true';
+
+if (!token || !isAdmin) { window.location.href = '/login'; }
+
 let allTeams = [];
 async function api(path,opts={}) {
   const headers={'Content-Type':'application/json','Authorization':`Bearer ${token}`};
-  return (await fetch('/api/v1'+path,{headers,...opts})).json();
+  const r = await fetch('/api/v1'+path,{headers,...opts});
+  if (r.status === 401 || r.status === 403) { window.location.href='/login'; return {}; }
+  return r.json();
 }
 async function loadStats() {
   const [teams,challenges,feed] = await Promise.all([
@@ -319,21 +325,22 @@ function filterTeams() {
   renderTeams(allTeams.filter(t=>t.name.toLowerCase().includes(q)||t.email.toLowerCase().includes(q)));
 }
 async function banTeam(name) {
-  if(!confirm(`Ban team ${name}?`)) return;
+  if(!confirm(`Ban team "${name}"? They will be logged out immediately.`)) return;
   await api('/admin/teams/ban',{method:'POST',body:JSON.stringify({team_name:name})});
   loadStats();
 }
 async function unbanTeam(name) {
+  if(!confirm(`Unban team "${name}"?`)) return;
   await api('/admin/teams/unban',{method:'POST',body:JSON.stringify({team_name:name})});
   loadStats();
 }
 async function resetScore(name) {
-  if(!confirm(`Reset score for ${name}?`)) return;
+  if(!confirm(`Reset ALL scores and solves for "${name}"?`)) return;
   await api('/admin/teams/reset',{method:'POST',body:JSON.stringify({team_name:name})});
   loadStats();
 }
 async function deleteTeam(name) {
-  if(!confirm(`DELETE team ${name}?`)) return;
+  if(!confirm(`PERMANENTLY DELETE team "${name}"?\n\nThis will remove all their solves, hints, and sessions. This CANNOT be undone.`)) return;
   await api('/admin/teams/delete',{method:'POST',body:JSON.stringify({team_name:name})});
   loadStats();
 }
@@ -359,6 +366,8 @@ INDEX_HTML = """<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{ ctf_name }}</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-adapter-moment/1.0.1/chartjs-adapter-moment.min.js"></script>
 <style>
 """ + BASE_STYLE + """
 .hero{text-align:center;padding:3rem 2rem 1rem}
@@ -607,8 +616,6 @@ async function loadScoreboard() {
     <td style="color:#4a8a6a;font-size:.8rem">${e.last_solve}</td>
     <td><button class="cert-btn" onclick="getCertificate('${e.team}','${i+1}')">🏆 CERT</button></td>
   </tr>`).join('');
-
-  // Draw graph
   await drawScoreGraph(data.scores.slice(0,5));
 }
 
@@ -616,22 +623,17 @@ async function drawScoreGraph(topTeams) {
   const timelines = await Promise.all(
     topTeams.map(t => api(`/scoreboard/timeline?team=${encodeURIComponent(t.team)}`))
   );
-
   const colors = ['#00ff88','#00d4ff','#ff003c','#ffb800','#aa00ff'];
-  const datasets = topTeams.map((t,i) => {
-    const tl = timelines[i].timeline||[];
-    return {
-      label: t.team,
-      data: tl.map(p=>({x:p.time*1000, y:p.total})),
-      borderColor: colors[i],
-      backgroundColor: colors[i]+'22',
-      borderWidth: 2,
-      pointRadius: 3,
-      tension: 0.3,
-      fill: false,
-    };
-  });
-
+  const datasets = topTeams.map((t,i) => ({
+    label: t.team,
+    data: (timelines[i].timeline||[]).map(p=>({x:p.time*1000, y:p.total})),
+    borderColor: colors[i],
+    backgroundColor: colors[i]+'22',
+    borderWidth: 2,
+    pointRadius: 3,
+    tension: 0.3,
+    fill: false,
+  }));
   const ctx = document.getElementById('scoreGraph').getContext('2d');
   if (scoreChart) scoreChart.destroy();
   scoreChart = new Chart(ctx, {
@@ -641,28 +643,12 @@ async function drawScoreGraph(topTeams) {
       responsive: true,
       interaction: { mode: 'index', intersect: false },
       plugins: {
-        legend: {
-          labels: { color: '#6a8', font: { family: 'Share Tech Mono' }, boxWidth: 12 }
-        },
-        tooltip: {
-          backgroundColor: '#0a1520',
-          borderColor: '#1a3a4a',
-          borderWidth: 1,
-          titleColor: '#00ff88',
-          bodyColor: '#cde',
-        }
+        legend: { labels: { color: '#6a8', font: { family: 'Share Tech Mono' }, boxWidth: 12 } },
+        tooltip: { backgroundColor: '#0a1520', borderColor: '#1a3a4a', borderWidth: 1, titleColor: '#00ff88', bodyColor: '#cde' }
       },
       scales: {
-        x: {
-          type: 'time',
-          time: { unit: 'hour' },
-          ticks: { color: '#4a8a6a', font: { family: 'Share Tech Mono', size: 10 } },
-          grid: { color: 'rgba(26,58,74,.5)' }
-        },
-        y: {
-          ticks: { color: '#4a8a6a', font: { family: 'Share Tech Mono', size: 10 } },
-          grid: { color: 'rgba(26,58,74,.5)' }
-        }
+        x: { type: 'time', time: { unit: 'hour' }, ticks: { color: '#4a8a6a', font: { family: 'Share Tech Mono', size: 10 } }, grid: { color: 'rgba(26,58,74,.5)' } },
+        y: { ticks: { color: '#4a8a6a', font: { family: 'Share Tech Mono', size: 10 } }, grid: { color: 'rgba(26,58,74,.5)' } }
       }
     }
   });
@@ -693,10 +679,7 @@ async function openModal(ch) {
   document.getElementById('modal-desc').textContent = ch.description||'Find the flag!';
   document.getElementById('flag-input').value = '';
   document.getElementById('result-msg').style.display = 'none';
-
-  // Load hints
   await loadHints(ch);
-
   document.getElementById('modal').classList.add('active');
   setTimeout(()=>document.getElementById('flag-input').focus(),100);
 }
@@ -704,17 +687,15 @@ async function openModal(ch) {
 async function loadHints(ch) {
   const section = document.getElementById('hints-section');
   if (!ch.hints?.length) { section.innerHTML = ''; return; }
-
   const unlocked = token ? await api(`/hints/${ch.id}`) : {unlocked:[]};
   const unlockedSet = new Set((unlocked.unlocked||[]).map(h=>h.hint_index));
-
   section.innerHTML = `<div class="hints-title">💡 HINTS (${ch.hints.length} available)</div>` +
     ch.hints.map((hint, i) => {
       const cost = Math.floor(ch.points * 0.1 * (i + 1));
       if (unlockedSet.has(i)) {
         return `<div class="hint-item">
           <div style="font-size:.7rem;color:#4a8a6a;margin-bottom:.35rem">HINT ${i+1} — UNLOCKED</div>
-          <div class="hint-text">${hint}</div>
+          <div class="hint-text">${unlocked.unlocked.find(h=>h.hint_index===i)?.text||''}</div>
         </div>`;
       }
       return `<div class="hint-item">
@@ -722,9 +703,7 @@ async function loadHints(ch) {
           <span style="font-size:.8rem;color:#6a8">Hint ${i+1}</span>
           <div style="display:flex;align-items:center;gap:.75rem">
             <span class="hint-cost">-${cost} pts</span>
-            <button class="hint-unlock-btn" onclick="unlockHint('${ch.id}',${i},${cost})">
-              UNLOCK
-            </button>
+            <button class="hint-unlock-btn" onclick="unlockHint('${ch.id}',${i},${cost})">UNLOCK</button>
           </div>
         </div>
       </div>`;
@@ -903,13 +882,11 @@ def create_app(config: Config = None) -> Flask:
 
     @app.route("/login")
     def login_page():
-        return render_template_string(LOGIN_HTML,
-            ctf_name=config.ctf_name, error=None, success=None)
+        return render_template_string(LOGIN_HTML, ctf_name=config.ctf_name)
 
     @app.route("/register")
     def register_page():
-        return render_template_string(REGISTER_HTML,
-            ctf_name=config.ctf_name, error=None)
+        return render_template_string(REGISTER_HTML, ctf_name=config.ctf_name)
 
     @app.route("/verify/<token>")
     def verify_email(token):
@@ -986,7 +963,6 @@ def create_app(config: Config = None) -> Flask:
     # ── Challenges API ─────────────────────────────────────────────────
     @app.route("/api/v1/challenges")
     def api_challenges():
-        import json
         challenges = manager.list_challenges()
         result = []
         for c in challenges:
@@ -995,7 +971,7 @@ def create_app(config: Config = None) -> Flask:
                 "id": c.id, "name": c.name, "category": c.category,
                 "points": c.points, "difficulty": c.difficulty,
                 "description": c.description, "solves": c.solves,
-                "hints": [None] * len(hints)  # Don't expose hint text
+                "hints": [None] * len(hints)
             })
         return jsonify({"challenges": result})
 
@@ -1044,34 +1020,24 @@ def create_app(config: Config = None) -> Flask:
         d = request.get_json()
         challenge_id = d.get("challenge_id","")
         hint_index = int(d.get("hint_index", 0))
-
         challenge = manager.get_challenge(challenge_id)
         if not challenge:
             return jsonify({"success": False, "message": "Challenge not found"})
         if hint_index >= len(challenge.hints):
             return jsonify({"success": False, "message": "Hint not found"})
-
-        # Check already unlocked
         existing = manager.db.fetchone(
             "SELECT id FROM hint_unlocks WHERE team=? AND challenge_id=? AND hint_index=?",
             (team, challenge_id, hint_index)
         )
         if existing:
             return jsonify({"success": True, "message": "Already unlocked"})
-
-        # Deduct points
         cost = int(challenge.points * 0.1 * (hint_index + 1))
         team_info = auth.get_team_info(team)
         if not team_info:
             return jsonify({"success": False, "message": "Team not found"})
         if team_info["score"] < cost:
             return jsonify({"success": False, "message": f"Not enough points! Need {cost} pts"})
-
-        # Deduct from score
-        manager.db.execute(
-            "UPDATE teams SET score = score - ? WHERE name=?", (cost, team)
-        )
-        # Record unlock
+        manager.db.execute("UPDATE teams SET score = score - ? WHERE name=?", (cost, team))
         manager.db.execute(
             "INSERT INTO hint_unlocks (team, challenge_id, hint_index, cost) VALUES (?,?,?,?)",
             (team, challenge_id, hint_index, cost)
@@ -1092,8 +1058,7 @@ def create_app(config: Config = None) -> Flask:
     @app.route("/api/v1/scoreboard/timeline")
     def api_timeline():
         team = request.args.get("team","")
-        timeline = scoreboard.get_score_timeline(team)
-        return jsonify({"timeline": timeline})
+        return jsonify({"timeline": scoreboard.get_score_timeline(team)})
 
     @app.route("/api/v1/feed")
     def api_feed():
@@ -1161,60 +1126,4 @@ def create_app(config: Config = None) -> Flask:
     @app.errorhandler(500)
     def server_error(e): return jsonify({"error": "Internal server error"}), 500
 
-    # Auto seed
-    def auto_seed():
-        import os, json
-        os.makedirs("challenges", exist_ok=True)
-        for cat in ["web","pwn","crypto","forensics","reverse","misc","osint","network"]:
-            os.makedirs(f"challenges/{cat}", exist_ok=True)
-        try:
-            existing = manager.list_challenges()
-            if len(existing) >= 1:
-                return
-            challenges = [
-                ("web","SQL Injection 101",100,"easy",
-                 "A login form is hiding something. Can you bypass authentication?",
-                 ["Try adding a single quote to the input","Look up SQL injection login bypass payloads"]),
-                ("web","JWT Bypass",200,"medium",
-                 "This API uses JSON Web Tokens. The dev made a classic mistake.",
-                 ["Check the algorithm field in the JWT header","Try changing the algorithm to 'none'"]),
-                ("web","XSS Attack",150,"medium",
-                 "A comment section reflects user input directly. Inject a script!",
-                 ["Try a basic <script>alert(1)</script>","Look for ways to steal document.cookie"]),
-                ("crypto","Broken RSA",200,"medium",
-                 "We intercepted an RSA-encrypted message. The developer reused primes.",
-                 ["Try computing GCD of the two moduli","Use the common factor to factor both keys"]),
-                ("crypto","Caesar's Secret",100,"easy",
-                 "An ancient encryption method was used. Shift your thinking!",
-                 ["Try all 26 possible shifts","Look for a shift that gives readable English"]),
-                ("pwn","Buffer Overflow",300,"hard",
-                 "A vulnerable C binary is running. Overflow the buffer and hijack execution.",
-                 ["Use cyclic pattern to find the offset","Check for a win() function in the binary"]),
-                ("reverse","Crack Me",150,"easy",
-                 "A Python binary checks your input against a secret key using XOR.",
-                 ["XOR is reversible - apply the same key twice","Try XORing each byte with 0x42"]),
-                ("forensics","Hidden Message",250,"hard",
-                 "We captured a suspicious image file. Something is hidden inside.",
-                 ["Try running strings on the file","Check for steganography tools like steghide"]),
-                ("osint","Find The Hacker",200,"medium",
-                 "A hacker left traces across the internet. Track them down.",
-                 ["Check common social media platforms","Try searching their username across multiple sites"]),
-                ("misc","Base Madness",100,"easy",
-                 "This string has been encoded multiple times. Decode it layer by layer.",
-                 ["Start with base64 decoding","Try base64 then base32 then hex"]),
-                ("network","Packet Secrets",250,"hard",
-                 "We captured network traffic during a suspicious transfer. Analyze the pcap.",
-                 ["Open in Wireshark and filter by protocol","Follow the TCP stream to see the full data"]),
-            ]
-            for category, name, points, difficulty, desc, hints in challenges:
-                ch = manager.create_challenge(category, name, points, difficulty, description=desc)
-                manager.db.execute(
-                    "UPDATE challenges SET hints=? WHERE id=?",
-                    (json.dumps(hints), ch.id)
-                )
-                print(f"[SEED] ✅ {ch.name} — {ch.flag}")
-        except Exception as e:
-            print(f"[SEED] Error: {e}")
-
-    auto_seed()
     return app

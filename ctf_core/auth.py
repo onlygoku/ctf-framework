@@ -1,15 +1,14 @@
-"""
-Auth - Email registration, verification, login, sessions, bruteforce protection
-"""
-
 import os
 import secrets
-import smtplib
 import time
+import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from dataclasses import dataclass
 from typing import Optional
+from collections import defaultdict
+
+import bcrypt
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 
 from .database import Database
@@ -19,7 +18,7 @@ from .config import Config
 @dataclass
 class AuthResult:
     success: bool
-    message: str = ""
+    message: str
     token: str = ""
     team: str = ""
 
@@ -38,21 +37,20 @@ class AuthManager:
                 name TEXT UNIQUE NOT NULL,
                 email TEXT UNIQUE NOT NULL,
                 password_hash TEXT NOT NULL,
-                country TEXT DEFAULT '',
                 score INTEGER DEFAULT 0,
                 solves INTEGER DEFAULT 0,
-                last_solve REAL DEFAULT 0,
+                country TEXT DEFAULT '',
                 verified INTEGER DEFAULT 0,
                 banned INTEGER DEFAULT 0,
+                last_solve REAL DEFAULT 0,
                 created_at REAL DEFAULT (strftime('%s', 'now'))
             )
         """)
         self.db.execute("""
             CREATE TABLE IF NOT EXISTS sessions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                team_name TEXT NOT NULL,
+                team TEXT NOT NULL,
                 token TEXT UNIQUE NOT NULL,
-                ip_address TEXT DEFAULT '',
                 created_at REAL DEFAULT (strftime('%s', 'now')),
                 expires_at REAL NOT NULL
             )
@@ -60,240 +58,180 @@ class AuthManager:
         self.db.execute("""
             CREATE TABLE IF NOT EXISTS login_attempts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                ip_address TEXT NOT NULL,
-                team_name TEXT DEFAULT '',
-                success INTEGER DEFAULT 0,
+                ip TEXT NOT NULL,
                 attempted_at REAL DEFAULT (strftime('%s', 'now'))
             )
         """)
 
-    def _hash_password(self, password: str) -> str:
-        import bcrypt
-        return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
-
-    def _verify_password(self, password: str, hashed: str) -> bool:
-        import bcrypt
-        return bcrypt.checkpw(password.encode(), hashed.encode())
-
-    def _is_bruteforce(self, ip: str) -> bool:
-        cutoff = time.time() - 300
-        row = self.db.fetchone("""
-            SELECT COUNT(*) FROM login_attempts
-            WHERE ip_address=? AND success=0 AND attempted_at > ?
-        """, (ip, cutoff))
-        return (row[0] if row else 0) >= 5
-
-    def _log_attempt(self, ip: str, team: str, success: bool):
-        self.db.execute(
-            "INSERT INTO login_attempts (ip_address, team_name, success) VALUES (?,?,?)",
-            (ip, team, int(success))
-        )
-
     def register(self, team_name: str, email: str, password: str, country: str = "") -> AuthResult:
-        if not self.config.registration_open:
-            return AuthResult(False, "Registration is closed.")
-        if len(team_name) < 3 or len(team_name) > 32:
-            return AuthResult(False, "Team name must be 3-32 characters.")
-        if len(password) < 8:
-            return AuthResult(False, "Password must be at least 8 characters.")
-        if "@" not in email or "." not in email.split("@")[-1]:
-            return AuthResult(False, "Invalid email address.")
+        if not team_name or len(team_name) < 2:
+            return AuthResult(False, "Team name must be at least 2 characters")
+        if not email or "@" not in email:
+            return AuthResult(False, "Invalid email address")
+        if not password or len(password) < 8:
+            return AuthResult(False, "Password must be at least 8 characters")
 
-        existing_name = self.db.fetchone(
-            "SELECT id FROM teams WHERE name=?", (team_name,)
-        )
-        if existing_name:
-            return AuthResult(False, "Team name already taken.")
+        if self.db.fetchone("SELECT id FROM teams WHERE name=?", (team_name,)):
+            return AuthResult(False, "Team name already taken")
+        if self.db.fetchone("SELECT id FROM teams WHERE email=?", (email,)):
+            return AuthResult(False, "Email already registered")
 
-        existing_email = self.db.fetchone(
-            "SELECT id FROM teams WHERE email=?", (email,)
-        )
-        if existing_email:
-            return AuthResult(False, "Email already registered.")
+        password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
-        password_hash = self._hash_password(password)
-        self.db.execute(
-            "INSERT INTO teams (name, email, password_hash, country) VALUES (?,?,?,?)",
-            (team_name, email, password_hash, country)
-        )
-        self._send_verification_email(email, team_name)
-        return AuthResult(True, "Registration successful! Check your email to verify.")
-
-    def _send_verification_email(self, email: str, team_name: str):
-        if os.getenv("SKIP_EMAIL", "false").lower() == "true":
-            print(f"[DEV MODE] Auto-verifying {team_name} ({email})")
+        if self.config.skip_email:
             self.db.execute(
-                "UPDATE teams SET verified=1 WHERE email=?", (email,)
+                "INSERT INTO teams (name, email, password_hash, country, verified) VALUES (?,?,?,?,1)",
+                (team_name, email, password_hash, country)
             )
-            return
+            return AuthResult(True, "Registration successful! You can now login.")
+        else:
+            self.db.execute(
+                "INSERT INTO teams (name, email, password_hash, country, verified) VALUES (?,?,?,?,0)",
+                (team_name, email, password_hash, country)
+            )
+            try:
+                self._send_verification_email(team_name, email)
+                return AuthResult(True, "Registration successful! Please check your email to verify your account.")
+            except Exception as e:
+                print(f"[AUTH] Email error: {e}")
+                return AuthResult(True, "Registration successful! (Email verification unavailable - contact admin)")
 
+    def _send_verification_email(self, team_name: str, email: str):
         token = self.serializer.dumps(email, salt="email-verify")
-        base_url = os.getenv("CTF_BASE_URL", "http://localhost:5000")
-        verify_url = f"{base_url}/verify/{token}"
-        ctf_name = self.config.ctf_name
-
-        html = f"""
-        <div style="font-family:monospace;background:#050a0f;color:#00ff88;padding:40px;border-radius:8px;">
-            <h1 style="color:#00ff88;">🏴 {ctf_name}</h1>
-            <p style="color:#cde;">Welcome, <strong>{team_name}</strong>!</p>
-            <p style="color:#cde;">Click below to verify your email.</p>
-            <a href="{verify_url}"
-               style="display:inline-block;margin:20px 0;padding:12px 24px;
-                      background:#00ff88;color:#050a0f;text-decoration:none;
-                      font-weight:bold;border-radius:4px;">
-               VERIFY EMAIL
-            </a>
-            <p style="color:#6a8;font-size:12px;">Expires in 24 hours.</p>
-        </div>
-        """
+        verify_url = f"{self.config.base_url}/verify/{token}"
 
         msg = MIMEMultipart("alternative")
-        msg["Subject"] = f"[{ctf_name}] Verify your email"
-        msg["From"] = os.getenv("MAIL_DEFAULT_SENDER", "noreply@ctf.local")
+        msg["Subject"] = f"[{self.config.ctf_name}] Verify your email"
+        msg["From"] = self.config.mail_sender or self.config.mail_username
         msg["To"] = email
+
+        html = f"""
+        <html><body style="background:#050a0f;color:#cde;font-family:monospace;padding:2rem;">
+        <h2 style="color:#00ff88;">Welcome to {self.config.ctf_name}, {team_name}!</h2>
+        <p>Click the link below to verify your email:</p>
+        <a href="{verify_url}" style="color:#00d4ff;">{verify_url}</a>
+        <p style="color:#4a8a6a;margin-top:2rem;">This link expires in 24 hours.</p>
+        </body></html>
+        """
         msg.attach(MIMEText(html, "html"))
 
-        try:
-            server = smtplib.SMTP(
-                os.getenv("MAIL_SERVER", "smtp.gmail.com"),
-                int(os.getenv("MAIL_PORT", "587"))
-            )
+        with smtplib.SMTP(self.config.mail_server, self.config.mail_port) as server:
             server.starttls()
-            server.login(os.getenv("MAIL_USERNAME"), os.getenv("MAIL_PASSWORD"))
-            server.sendmail(msg["From"], email, msg.as_string())
-            server.quit()
-            print(f"[EMAIL] Sent to {email}")
-        except Exception as e:
-            print(f"[EMAIL ERROR] {e}")
+            server.login(self.config.mail_username, self.config.mail_password)
+            server.sendmail(self.config.mail_username, email, msg.as_string())
 
     def verify_email(self, token: str) -> AuthResult:
         try:
-            email = self.serializer.loads(
-                token, salt="email-verify", max_age=86400
-            )
+            email = self.serializer.loads(token, salt="email-verify", max_age=86400)
+            row = self.db.fetchone("SELECT name FROM teams WHERE email=?", (email,))
+            if not row:
+                return AuthResult(False, "Team not found")
+            self.db.execute("UPDATE teams SET verified=1 WHERE email=?", (email,))
+            return AuthResult(True, "Email verified! You can now login.")
         except SignatureExpired:
-            return AuthResult(False, "Link expired. Please register again.")
+            return AuthResult(False, "Verification link has expired.")
         except BadSignature:
             return AuthResult(False, "Invalid verification link.")
 
-        row = self.db.fetchone(
-            "SELECT name, verified FROM teams WHERE email=?", (email,)
-        )
+    def resend_verification(self, email: str) -> AuthResult:
+        row = self.db.fetchone("SELECT name, verified FROM teams WHERE email=?", (email,))
         if not row:
-            return AuthResult(False, "Account not found.")
+            return AuthResult(False, "Email not found")
         if row[1]:
-            return AuthResult(True, "Already verified! You can log in.")
-
-        self.db.execute(
-            "UPDATE teams SET verified=1 WHERE email=?", (email,)
-        )
-        return AuthResult(True, f"Email verified! Welcome, {row[0]}!")
+            return AuthResult(False, "Email already verified")
+        try:
+            self._send_verification_email(row[0], email)
+            return AuthResult(True, "Verification email resent!")
+        except Exception as e:
+            return AuthResult(False, f"Failed to send email: {e}")
 
     def login(self, team_name: str, password: str, ip: str = "0.0.0.0") -> AuthResult:
-        if self._is_bruteforce(ip):
-            return AuthResult(False, "Too many failed attempts. Try again in 5 minutes.")
+        now = time.time()
+        attempts = self.db.fetchall(
+            "SELECT id FROM login_attempts WHERE ip=? AND attempted_at > ?",
+            (ip, now - 300)
+        )
+        if len(attempts) >= 5:
+            return AuthResult(False, "Too many login attempts. Try again in 5 minutes.")
+
+        self.db.execute("INSERT INTO login_attempts (ip) VALUES (?)", (ip,))
 
         row = self.db.fetchone(
             "SELECT name, password_hash, verified, banned FROM teams WHERE name=?",
             (team_name,)
         )
-
         if not row:
-            self._log_attempt(ip, team_name, False)
-            return AuthResult(False, "Invalid team name or password.")
+            return AuthResult(False, "Invalid team name or password")
 
-        name, password_hash, verified, banned = row
+        name, pw_hash, verified, banned = row
 
-        if not self._verify_password(password, password_hash):
-            self._log_attempt(ip, team_name, False)
-            return AuthResult(False, "Invalid team name or password.")
-
+        if not bcrypt.checkpw(password.encode(), pw_hash.encode()):
+            return AuthResult(False, "Invalid team name or password")
         if banned:
-            return AuthResult(False, "This team has been banned.")
-
+            return AuthResult(False, "Your team has been banned.")
         if not verified:
-            return AuthResult(False, "Please verify your email first.")
+            return AuthResult(False, "Please verify your email before logging in.")
 
-        self._log_attempt(ip, team_name, True)
-
-        token = secrets.token_urlsafe(32)
-        expires = time.time() + (24 * 3600)
+        token = secrets.token_hex(32)
+        expires = now + 86400
         self.db.execute(
-            "INSERT INTO sessions (team_name, token, ip_address, expires_at) VALUES (?,?,?,?)",
-            (name, token, ip, expires)
+            "INSERT INTO sessions (team, token, expires_at) VALUES (?,?,?)",
+            (name, token, expires)
         )
-        return AuthResult(True, f"Welcome back, {name}!", token=token, team=name)
+        return AuthResult(True, "Login successful!", token=token, team=name)
 
     def validate_session(self, token: str) -> Optional[str]:
         if not token:
             return None
         row = self.db.fetchone(
-            "SELECT team_name, expires_at FROM sessions WHERE token=?", (token,)
+            "SELECT team FROM sessions WHERE token=? AND expires_at > ?",
+            (token, time.time())
         )
-        if not row:
-            return None
-        team_name, expires_at = row
-        if time.time() > expires_at:
-            self.db.execute("DELETE FROM sessions WHERE token=?", (token,))
-            return None
-        return team_name
+        return row[0] if row else None
 
     def logout(self, token: str):
         self.db.execute("DELETE FROM sessions WHERE token=?", (token,))
 
+    def is_admin(self, team_name: str) -> bool:
+        return team_name == self.config.admin_username
+
     def get_team_info(self, team_name: str) -> Optional[dict]:
         row = self.db.fetchone(
-            "SELECT name, email, country, score, solves, verified, created_at FROM teams WHERE name=?",
+            "SELECT name, score, solves, country, verified, banned FROM teams WHERE name=?",
             (team_name,)
         )
         if not row:
             return None
         return {
-            "name": row[0], "email": row[1], "country": row[2],
-            "score": row[3], "solves": row[4],
-            "verified": bool(row[5]), "created_at": row[6]
+            "name": row[0], "score": row[1], "solves": row[2],
+            "country": row[3], "verified": bool(row[4]), "banned": bool(row[5])
         }
 
-    def resend_verification(self, email: str) -> AuthResult:
-        row = self.db.fetchone(
-            "SELECT name, verified FROM teams WHERE email=?", (email,)
-        )
-        if not row:
-            return AuthResult(False, "Email not found.")
-        if row[1]:
-            return AuthResult(False, "Already verified!")
-        self._send_verification_email(email, row[0])
-        return AuthResult(True, "Verification email resent!")
-    
     def get_all_teams(self) -> list:
-        rows = self.db.fetchall("""
-            SELECT name, email, country, score, solves, verified, banned, created_at
-            FROM teams ORDER BY score DESC
-        """)
-        return [{"name": r[0], "email": r[1], "country": r[2],
-                 "score": r[3], "solves": r[4], "verified": bool(r[5]),
-                 "banned": bool(r[6]), "created_at": r[7]} for r in rows]
+        rows = self.db.fetchall(
+            "SELECT name, email, score, solves, country, verified, banned FROM teams ORDER BY score DESC"
+        )
+        return [
+            {"name": r[0], "email": r[1], "score": r[2], "solves": r[3],
+             "country": r[4], "verified": bool(r[5]), "banned": bool(r[6])}
+            for r in rows
+        ]
 
-    def ban_team(self, team_name: str) -> bool:
-        self.db.execute("UPDATE teams SET banned=1 WHERE name=?", (team_name,))
-        return True
+    def ban_team(self, name: str):
+        self.db.execute("UPDATE teams SET banned=1 WHERE name=?", (name,))
+        self.db.execute("DELETE FROM sessions WHERE team=?", (name,))
 
-    def unban_team(self, team_name: str) -> bool:
-        self.db.execute("UPDATE teams SET banned=0 WHERE name=?", (team_name,))
-        return True
+    def unban_team(self, name: str):
+        self.db.execute("UPDATE teams SET banned=0 WHERE name=?", (name,))
 
-    def delete_team(self, team_name: str) -> bool:
-        self.db.execute("DELETE FROM teams WHERE name=?", (team_name,))
-        self.db.execute("DELETE FROM solves WHERE team=?", (team_name,))
-        self.db.execute("DELETE FROM sessions WHERE team_name=?", (team_name,))
-        return True
+    def delete_team(self, name: str):
+        self.db.execute("DELETE FROM solves WHERE team=?", (name,))
+        self.db.execute("DELETE FROM sessions WHERE team=?", (name,))
+        self.db.execute("DELETE FROM hint_unlocks WHERE team=?", (name,))
+        self.db.execute("DELETE FROM submissions WHERE team=?", (name,))
+        self.db.execute("DELETE FROM teams WHERE name=?", (name,))
 
-    def reset_team_score(self, team_name: str) -> bool:
-        self.db.execute("UPDATE teams SET score=0, solves=0 WHERE name=?", (team_name,))
-        self.db.execute("DELETE FROM solves WHERE team=?", (team_name,))
-        return True
-
-    def is_admin(self, team_name: str) -> bool:
-        admin = os.getenv("CTF_ADMIN", "admin")
-        return team_name == admin
-    
+    def reset_team_score(self, name: str):
+        self.db.execute("UPDATE teams SET score=0, solves=0, last_solve=0 WHERE name=?", (name,))
+        self.db.execute("DELETE FROM solves WHERE team=?", (name,))
+        self.db.execute("DELETE FROM hint_unlocks WHERE team=?", (name,))
