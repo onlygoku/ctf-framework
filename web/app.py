@@ -154,7 +154,6 @@ async function login() {
       body: JSON.stringify({team_name: team, password: password})
     });
     const data = await r.json();
-    console.log('Login response:', JSON.stringify(data, null, 2));
     if (data.success) {
       localStorage.setItem('ctf_token', data.token);
       localStorage.setItem('ctf_team', data.team);
@@ -173,7 +172,6 @@ async function login() {
       btn.disabled = false;
     }
   } catch(e) {
-    console.error('Login error:', e);
     showAlert('Network error - please try again', 'error');
     btn.textContent = 'LOGIN →';
     btn.disabled = false;
@@ -252,7 +250,6 @@ async function register() {
       body: JSON.stringify({team_name: name, email, password, country})
     });
     const data = await r.json();
-    console.log('Register response:', JSON.stringify(data, null, 2));
     showAlert(data.message, data.success ? 'success' : 'error');
     if (data.success) {
       setTimeout(() => window.location.href = '/login', 2500);
@@ -261,7 +258,6 @@ async function register() {
       btn.disabled = false;
     }
   } catch(e) {
-    console.error('Register error:', e);
     showAlert('Network error - please try again', 'error');
     btn.textContent = 'CREATE TEAM →';
     btn.disabled = false;
@@ -993,97 +989,6 @@ def create_app(config: Config = None) -> Flask:
             score=score, solves=solves,
             date=datetime.now().strftime("%B %d, %Y"),
             cert_id=cert_id)
-
-    # ── Debug / Setup Routes (REMOVE AFTER USE) ────────────────────────
-    @app.route("/debug-schema")
-    def debug_schema():
-        try:
-            all_tables = ['teams', 'sessions', 'login_attempts', 'solves', 'hint_unlocks', 'submissions', 'challenges']
-            output = ""
-            for table in all_tables:
-                cols = auth.db.fetchall(f"""
-                    SELECT column_name, data_type FROM information_schema.columns
-                    WHERE table_name = '{table}' ORDER BY ordinal_position
-                """)
-                output += f"{table.upper()}:\n"
-                output += "\n".join([f"  {r[0]} — {r[1]}" for r in cols]) or "  (no columns found)"
-                output += "\n\n"
-            return f"<pre style='background:#111;color:#0f0;padding:2rem;font-family:monospace'>{output}</pre>"
-        except Exception as e:
-            return f"<pre style='color:red'>Error: {e}\n{traceback.format_exc()}</pre>", 500
-
-    @app.route("/fix-all-now")
-    def fix_all():
-        try:
-            results = []
-
-            # Show all current columns
-            all_tables = ['teams', 'sessions', 'login_attempts', 'solves', 'hint_unlocks', 'submissions', 'challenges']
-            for table in all_tables:
-                cols = auth.db.fetchall(f"""
-                    SELECT column_name FROM information_schema.columns
-                    WHERE table_name = '{table}' ORDER BY ordinal_position
-                """)
-                results.append(f"{table.upper()}: " + ", ".join([c[0] for c in cols]))
-
-            results.append("\n--- FIXING TEAMS ---")
-            for sql in [
-                "ALTER TABLE teams ADD COLUMN IF NOT EXISTS email TEXT DEFAULT ''",
-                "ALTER TABLE teams ADD COLUMN IF NOT EXISTS password_hash TEXT DEFAULT ''",
-                "ALTER TABLE teams ADD COLUMN IF NOT EXISTS verified INTEGER DEFAULT 0",
-                "ALTER TABLE teams ADD COLUMN IF NOT EXISTS banned INTEGER DEFAULT 0",
-            ]:
-                try:
-                    auth.db.execute(sql)
-                    results.append(f"OK: {sql}")
-                except Exception as e:
-                    results.append(f"SKIP: {e}")
-
-            results.append("\n--- FIXING SESSIONS ---")
-            for sql in [
-                "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS team TEXT DEFAULT ''",
-                "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS token TEXT DEFAULT ''",
-                "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS expires_at REAL DEFAULT 0",
-                "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS created_at REAL DEFAULT 0",
-            ]:
-                try:
-                    auth.db.execute(sql)
-                    results.append(f"OK: {sql}")
-                except Exception as e:
-                    results.append(f"SKIP: {e}")
-
-            results.append("\n--- FINAL COLUMNS ---")
-            for table in ['teams', 'sessions']:
-                cols = auth.db.fetchall(f"""
-                    SELECT column_name FROM information_schema.columns
-                    WHERE table_name = '{table}' ORDER BY ordinal_position
-                """)
-                results.append(f"{table.upper()}: " + ", ".join([c[0] for c in cols]))
-
-            return f"<pre style='background:#111;color:#0f0;padding:2rem'>" + "\n".join(results) + "</pre>"
-        except Exception as e:
-            return f"<pre style='color:red'>Error: {e}\n{traceback.format_exc()}</pre>", 500
-
-    @app.route("/setup-admin-now")
-    def setup_admin():
-        try:
-            import bcrypt
-            admin_name = config.admin_username
-            admin_pass = config.admin_password
-            cols = auth.db.fetchall("""
-                SELECT column_name FROM information_schema.columns
-                WHERE table_name = 'teams'
-            """)
-            col_names = [c[0] for c in cols]
-            auth.db.execute("DELETE FROM teams WHERE name=?", (admin_name,))
-            pw_hash = bcrypt.hashpw(admin_pass.encode(), bcrypt.gensalt()).decode()
-            auth.db.execute(
-                "INSERT INTO teams (name, email, password_hash, country, verified, banned) VALUES (?,?,?,?,1,0)",
-                (admin_name, f"{admin_name}@ctf.local", pw_hash, "")
-            )
-            return f"<pre style='background:#111;color:#0f0;padding:2rem'>Admin '{admin_name}' recreated!\nPassword: {admin_pass}\nColumns: {col_names}\n\nNOW DELETE THESE DEBUG ROUTES AND REDEPLOY!</pre>"
-        except Exception as e:
-            return f"<pre style='color:red'>Error: {e}\n{traceback.format_exc()}</pre>", 500
 
     # ── Auth API ───────────────────────────────────────────────────────
     @app.route("/api/v1/auth/register", methods=["POST"])
