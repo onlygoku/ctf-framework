@@ -37,8 +37,13 @@ nav a:hover,nav a.active{color:var(--green)}
 .form-group input{width:100%;padding:.75rem 1rem;background:var(--bg);border:1px solid var(--border);color:#cde;font-family:'Share Tech Mono',monospace;font-size:.9rem;border-radius:2px;outline:none;transition:border-color .2s}
 .form-group input:focus{border-color:var(--green)}
 .form-group input::placeholder{color:#3a5a4a}
+.pw-wrap{position:relative}
+.pw-wrap input{padding-right:3rem}
+.pw-toggle{position:absolute;right:.75rem;top:50%;transform:translateY(-50%);background:none;border:none;color:#4a8a6a;cursor:pointer;font-size:1rem;padding:0;line-height:1}
+.pw-toggle:hover{color:var(--green)}
 .btn{padding:.75rem 1.5rem;font-family:'Share Tech Mono',monospace;font-size:.85rem;letter-spacing:.1em;border:1px solid var(--green);background:transparent;color:var(--green);cursor:pointer;border-radius:2px;transition:background .2s}
 .btn:hover{background:rgba(0,255,136,.1)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
 .btn-full{width:100%;margin-top:.5rem}
 .btn-red{border-color:var(--red)!important;color:var(--red)!important}
 .btn-red:hover{background:rgba(255,0,60,.1)!important}
@@ -111,35 +116,65 @@ LOGIN_HTML = """<!DOCTYPE html>
   <div class="form-group"><label>TEAM NAME</label>
     <input type="text" id="team" placeholder="your_team_name"/></div>
   <div class="form-group"><label>PASSWORD</label>
-    <input type="password" id="password" placeholder="••••••••"/></div>
-  <button class="btn btn-full" onclick="login()">LOGIN →</button>
+    <div class="pw-wrap">
+      <input type="password" id="password" placeholder="••••••••"/>
+      <button class="pw-toggle" onclick="togglePw('password','eye1')" type="button">
+        <span id="eye1">👁</span>
+      </button>
+    </div>
+  </div>
+  <button class="btn btn-full" id="login-btn" onclick="login()">LOGIN →</button>
   <div class="text-center"><a href="/register" class="link">No account? Register here</a></div>
 </div></div>
 <script>
+function togglePw(inputId, eyeId) {
+  const input = document.getElementById(inputId);
+  const eye = document.getElementById(eyeId);
+  if (input.type === 'password') {
+    input.type = 'text';
+    eye.textContent = '🙈';
+  } else {
+    input.type = 'password';
+    eye.textContent = '👁';
+  }
+}
 async function login() {
   const team = document.getElementById('team').value.trim();
   const password = document.getElementById('password').value;
   document.querySelectorAll('.alert').forEach(m => m.remove());
   if (!team || !password) return showAlert('Fill in all fields', 'error');
-
-  const r = await fetch('/api/v1/auth/login', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({team_name: team, password: password})
-  });
-  const data = await r.json();
-
-  if (data.success) {
-    localStorage.setItem('ctf_token', data.token);
-    localStorage.setItem('ctf_team', data.team);
-    localStorage.setItem('ctf_is_admin', data.is_admin === true ? 'true' : 'false');
-    if (data.is_admin === true) {
-      window.location.href = '/admin';
+  const btn = document.getElementById('login-btn');
+  btn.textContent = 'LOGGING IN...';
+  btn.disabled = true;
+  try {
+    const r = await fetch('/api/v1/auth/login', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({team_name: team, password: password})
+    });
+    const data = await r.json();
+    console.log('Login response:', data);
+    if (data.success) {
+      localStorage.setItem('ctf_token', data.token);
+      localStorage.setItem('ctf_team', data.team);
+      localStorage.setItem('ctf_is_admin', data.is_admin === true ? 'true' : 'false');
+      showAlert('Login successful! Redirecting...', 'success');
+      setTimeout(() => {
+        if (data.is_admin === true) {
+          window.location.href = '/admin';
+        } else {
+          window.location.href = '/';
+        }
+      }, 800);
     } else {
-      window.location.href = '/';
+      showAlert(data.message || 'Login failed', 'error');
+      btn.textContent = 'LOGIN →';
+      btn.disabled = false;
     }
-  } else {
-    showAlert(data.message || 'Login failed', 'error');
+  } catch(e) {
+    showAlert('Network error - please try again', 'error');
+    btn.textContent = 'LOGIN →';
+    btn.disabled = false;
   }
 }
 function showAlert(msg, type) {
@@ -163,15 +198,38 @@ REGISTER_HTML = """<!DOCTYPE html>
   <div class="form-group"><label>EMAIL</label>
     <input type="email" id="email" placeholder="team@email.com"/></div>
   <div class="form-group"><label>PASSWORD</label>
-    <input type="password" id="password" placeholder="min 8 characters"/></div>
+    <div class="pw-wrap">
+      <input type="password" id="password" placeholder="min 8 characters"/>
+      <button class="pw-toggle" onclick="togglePw('password','eye1')" type="button">
+        <span id="eye1">👁</span>
+      </button>
+    </div>
+  </div>
   <div class="form-group"><label>CONFIRM PASSWORD</label>
-    <input type="password" id="confirm" placeholder="repeat password"/></div>
+    <div class="pw-wrap">
+      <input type="password" id="confirm" placeholder="repeat password"/>
+      <button class="pw-toggle" onclick="togglePw('confirm','eye2')" type="button">
+        <span id="eye2">👁</span>
+      </button>
+    </div>
+  </div>
   <div class="form-group"><label>COUNTRY (optional)</label>
     <input type="text" id="country" placeholder="India"/></div>
-  <button class="btn btn-full" onclick="register()">CREATE TEAM →</button>
+  <button class="btn btn-full" id="reg-btn" onclick="register()">CREATE TEAM →</button>
   <div class="text-center"><a href="/login" class="link">Already registered? Login</a></div>
 </div></div>
 <script>
+function togglePw(inputId, eyeId) {
+  const input = document.getElementById(inputId);
+  const eye = document.getElementById(eyeId);
+  if (input.type === 'password') {
+    input.type = 'text';
+    eye.textContent = '🙈';
+  } else {
+    input.type = 'password';
+    eye.textContent = '👁';
+  }
+}
 async function register() {
   const name = document.getElementById('name').value.trim();
   const email = document.getElementById('email').value.trim();
@@ -182,18 +240,28 @@ async function register() {
   if (!name || !email || !password) return showAlert('Fill in all required fields', 'error');
   if (password !== confirm) return showAlert('Passwords do not match', 'error');
   if (password.length < 8) return showAlert('Password must be at least 8 characters', 'error');
-  const r = await fetch('/api/v1/auth/register', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({team_name: name, email, password, country})
-  });
-  const data = await r.json();
-  showAlert(data.message, data.success ? 'success' : 'error');
-  if (data.success) setTimeout(() => window.location.href = '/login', 2000);
-}
-function showAlert(msg, type) {
-  document.querySelector('.card').insertAdjacentHTML('afterbegin',
-    `<div class="alert alert-${type}">${msg}</div>`);
+  const btn = document.getElementById('reg-btn');
+  btn.textContent = 'REGISTERING...';
+  btn.disabled = true;
+  try {
+    const r = await fetch('/api/v1/auth/register', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({team_name: name, email, password, country})
+    });
+    const data = await r.json();
+    showAlert(data.message, data.success ? 'success' : 'error');
+    if (data.success) {
+      setTimeout(() => window.location.href = '/login', 2500);
+    } else {
+      btn.textContent = 'CREATE TEAM →';
+      btn.disabled = false;
+    }
+  } catch(e) {
+    showAlert('Network error - please try again', 'error');
+    btn.textContent = 'CREATE TEAM →';
+    btn.disabled = false;
+  }
 }
 document.addEventListener('keydown', e => { if (e.key === 'Enter') register(); });
 </script></body></html>"""
@@ -272,23 +340,15 @@ ADMIN_HTML = """<!DOCTYPE html>
 const token = localStorage.getItem('ctf_token');
 const isAdmin = localStorage.getItem('ctf_is_admin') === 'true';
 
-if (!token || !isAdmin) {
-  window.location.href = '/login';
-}
+if (!token || !isAdmin) { window.location.href = '/login'; }
 
 let allTeams = [];
-
 async function api(path, opts={}) {
-  const headers = {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`};
-  const r = await fetch('/api/v1' + path, {headers, ...opts});
-  if (r.status === 401 || r.status === 403) {
-    localStorage.clear();
-    window.location.href = '/login';
-    return {};
-  }
+  const headers = {'Content-Type':'application/json', 'Authorization': `Bearer ${token}`};
+  const r = await fetch('/api/v1'+path, {headers, ...opts});
+  if (r.status === 401 || r.status === 403) { window.location.href = '/login'; return {}; }
   return r.json();
 }
-
 async function loadStats() {
   const [teams, challenges, feed] = await Promise.all([
     api('/admin/teams'), api('/challenges'), api('/feed')
@@ -299,8 +359,7 @@ async function loadStats() {
   document.getElementById('stat-solves').textContent = (feed.events||[]).length;
   document.getElementById('stat-verified').textContent = allTeams.filter(t=>t.verified).length;
   renderTeams(allTeams);
-  const cb = document.getElementById('challenges-body');
-  cb.innerHTML = (challenges.challenges||[]).map(c=>`<tr>
+  document.getElementById('challenges-body').innerHTML = (challenges.challenges||[]).map(c=>`<tr>
     <td>${c.name}</td>
     <td><span class="badge badge-blue">${c.category}</span></td>
     <td style="color:var(--green)">${c.points}</td>
@@ -308,8 +367,7 @@ async function loadStats() {
     <td>${c.solves}</td>
     <td style="color:#6a8">${c.hints?.length||0} hints</td>
   </tr>`).join('');
-  const sb = document.getElementById('solves-body');
-  sb.innerHTML = (feed.events||[]).map(e=>`<tr>
+  document.getElementById('solves-body').innerHTML = (feed.events||[]).map(e=>`<tr>
     <td style="color:#4a8a6a">${e.timestamp}</td>
     <td style="color:var(--blue)">${e.team}</td>
     <td>${e.challenge}</td>
@@ -317,7 +375,6 @@ async function loadStats() {
     <td>${e.first_blood?'🩸 YES':''}</td>
   </tr>`).join('');
 }
-
 function renderTeams(teams) {
   document.getElementById('teams-body').innerHTML = teams.map(t=>`<tr>
     <td style="color:#eef;font-weight:bold">${t.name}</td>
@@ -331,7 +388,7 @@ function renderTeams(teams) {
     </td>
     <td>
       <button class="btn btn-sm ${t.banned?'btn-blue':'btn-red'}"
-              onclick="${t.banned?`unbanTeam('${t.name}')`:`banTeam('${t.name}')`}">
+        onclick="${t.banned?`unbanTeam('${t.name}')`:`banTeam('${t.name}')`}">
         ${t.banned?'UNBAN':'BAN'}
       </button>
       <button class="btn btn-sm" style="margin-left:4px" onclick="resetScore('${t.name}')">RESET</button>
@@ -339,14 +396,10 @@ function renderTeams(teams) {
     </td>
   </tr>`).join('');
 }
-
 function filterTeams() {
   const q = document.getElementById('search').value.toLowerCase();
-  renderTeams(allTeams.filter(t =>
-    t.name.toLowerCase().includes(q) || t.email.toLowerCase().includes(q)
-  ));
+  renderTeams(allTeams.filter(t=>t.name.toLowerCase().includes(q)||t.email.toLowerCase().includes(q)));
 }
-
 async function banTeam(name) {
   if (!confirm(`Ban team "${name}"? They will be logged out immediately.`)) return;
   await api('/admin/teams/ban', {method:'POST', body:JSON.stringify({team_name:name})});
@@ -367,20 +420,17 @@ async function deleteTeam(name) {
   await api('/admin/teams/delete', {method:'POST', body:JSON.stringify({team_name:name})});
   loadStats();
 }
-
 function switchTab(name) {
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
   document.getElementById('panel-'+name).classList.add('active');
 }
-
 function logout() {
   fetch('/api/v1/auth/logout', {method:'POST', headers:{'Authorization':`Bearer ${token}`}});
   localStorage.clear();
   window.location.href = '/login';
 }
-
 loadStats();
 setInterval(loadStats, 30000);
 </script></body></html>"""
@@ -564,30 +614,27 @@ if (token && team) {
 }
 
 async function api(path, opts={}) {
-  const headers = {'Content-Type': 'application/json'};
+  const headers = {'Content-Type':'application/json'};
   if (token) headers['Authorization'] = `Bearer ${token}`;
-  return (await fetch('/api/v1' + path, {headers, ...opts})).json();
+  return (await fetch('/api/v1'+path, {headers, ...opts})).json();
 }
 
 async function loadChallenges() {
   const data = await api('/challenges');
   const myData = token ? await api('/me/solves') : {solves:[]};
-  const mySolves = new Set((myData.solves||[]).map(s => s.challenge_id));
+  const mySolves = new Set((myData.solves||[]).map(s=>s.challenge_id));
   const grid = document.getElementById('challenges-grid');
   const prompt = document.getElementById('login-prompt-box');
-
   if (!token) {
     prompt.innerHTML = `<div class="login-prompt">
       <p>🔐 Login to submit flags and compete</p>
       <a href="/login">LOGIN</a><a href="/register">REGISTER</a>
     </div>`;
   }
-
   if (!data.challenges?.length) {
     grid.innerHTML = '<div style="color:#4a8a6a;padding:2rem;">No challenges yet.</div>';
     return;
   }
-
   document.getElementById('stat-challenges').textContent = data.challenges.length;
   const grouped = {};
   data.challenges.forEach(ch => {
@@ -595,13 +642,12 @@ async function loadChallenges() {
     grouped[ch.category].push(ch);
   });
   grid.innerHTML = '';
-
   Object.entries(grouped).sort().forEach(([cat, chs]) => {
     const hdr = document.createElement('div');
     hdr.style.cssText = 'grid-column:1/-1;font-size:.75rem;letter-spacing:.2em;color:var(--blue);padding:.5rem 0;border-bottom:1px solid var(--border);margin-bottom:.5rem;';
     hdr.textContent = `// ${cat.toUpperCase()}`;
     grid.appendChild(hdr);
-    chs.sort((a,b) => a.points - b.points).forEach(ch => {
+    chs.sort((a,b)=>a.points-b.points).forEach(ch => {
       const solved = mySolves.has(ch.id);
       const card = document.createElement('div');
       card.className = 'challenge-card';
@@ -619,7 +665,7 @@ async function loadChallenges() {
         <div class="ch-desc">${ch.description||''}</div>
         <div class="ch-solves">${ch.solves} solve${ch.solves!==1?'s':''}</div>
         ${ch.hints?.length ? `<div class="ch-hints">💡 ${ch.hints.length} hints available</div>` : ''}`;
-      card.onclick = () => token ? openModal(ch) : window.location.href = '/login';
+      card.onclick = () => token ? openModal(ch) : window.location.href='/login';
       grid.appendChild(card);
     });
   });
@@ -628,13 +674,13 @@ async function loadChallenges() {
 async function loadScoreboard() {
   const data = await api('/scoreboard');
   const ranks = ['🥇','🥈','🥉'];
-  document.getElementById('stat-teams').textContent = data.scores?.length || 0;
+  document.getElementById('stat-teams').textContent = data.scores?.length||0;
   const tbody = document.getElementById('scoreboard-body');
   if (!data.scores?.length) {
     tbody.innerHTML = '<tr><td colspan="6" style="color:#4a8a6a;padding:1rem;">No teams yet.</td></tr>';
     return;
   }
-  tbody.innerHTML = data.scores.map((e,i) => `<tr>
+  tbody.innerHTML = data.scores.map((e,i)=>`<tr>
     <td style="color:${i===0?'#ffd700':i===1?'#c0c0c0':i===2?'#cd7f32':'#cde'}">${ranks[i]||(i+1)}</td>
     <td style="font-weight:bold">${e.team}</td>
     <td style="color:var(--green);font-family:Orbitron,sans-serif">${e.score}</td>
@@ -652,7 +698,7 @@ async function drawScoreGraph(topTeams) {
   const colors = ['#00ff88','#00d4ff','#ff003c','#ffb800','#aa00ff'];
   const datasets = topTeams.map((t,i) => ({
     label: t.team,
-    data: (timelines[i].timeline||[]).map(p => ({x: p.time*1000, y: p.total})),
+    data: (timelines[i].timeline||[]).map(p=>({x:p.time*1000, y:p.total})),
     borderColor: colors[i],
     backgroundColor: colors[i]+'22',
     borderWidth: 2,
@@ -667,14 +713,14 @@ async function drawScoreGraph(topTeams) {
     data: { datasets },
     options: {
       responsive: true,
-      interaction: { mode: 'index', intersect: false },
+      interaction: { mode:'index', intersect:false },
       plugins: {
-        legend: { labels: { color: '#6a8', font: { family: 'Share Tech Mono' }, boxWidth: 12 } },
-        tooltip: { backgroundColor: '#0a1520', borderColor: '#1a3a4a', borderWidth: 1, titleColor: '#00ff88', bodyColor: '#cde' }
+        legend: { labels: { color:'#6a8', font:{family:'Share Tech Mono'}, boxWidth:12 } },
+        tooltip: { backgroundColor:'#0a1520', borderColor:'#1a3a4a', borderWidth:1, titleColor:'#00ff88', bodyColor:'#cde' }
       },
       scales: {
-        x: { type: 'time', time: { unit: 'hour' }, ticks: { color: '#4a8a6a', font: { family: 'Share Tech Mono', size: 10 } }, grid: { color: 'rgba(26,58,74,.5)' } },
-        y: { ticks: { color: '#4a8a6a', font: { family: 'Share Tech Mono', size: 10 } }, grid: { color: 'rgba(26,58,74,.5)' } }
+        x: { type:'time', time:{unit:'hour'}, ticks:{color:'#4a8a6a', font:{family:'Share Tech Mono',size:10}}, grid:{color:'rgba(26,58,74,.5)'} },
+        y: { ticks:{color:'#4a8a6a', font:{family:'Share Tech Mono',size:10}}, grid:{color:'rgba(26,58,74,.5)'} }
       }
     }
   });
@@ -688,13 +734,13 @@ async function loadFeed() {
     return;
   }
   document.getElementById('stat-solves').textContent = data.events.length;
-  feed.innerHTML = data.events.map(e => `
+  feed.innerHTML = data.events.map(e=>`
     <div class="feed-item">
       <span class="feed-time">[${e.timestamp}]</span>
       <span class="feed-team">${e.team}</span>
       <span style="color:#4a8a6a">solved</span>
       <span>${e.challenge}</span>
-      ${e.first_blood ? '<span style="color:var(--red)">🩸 FIRST BLOOD</span>' : ''}
+      ${e.first_blood?'<span style="color:var(--red)">🩸 FIRST BLOOD</span>':''}
       <span class="feed-pts">+${e.points}</span>
     </div>`).join('');
 }
@@ -702,19 +748,19 @@ async function loadFeed() {
 async function openModal(ch) {
   currentChallenge = ch;
   document.getElementById('modal-title').textContent = ch.name;
-  document.getElementById('modal-desc').textContent = ch.description || 'Find the flag!';
+  document.getElementById('modal-desc').textContent = ch.description||'Find the flag!';
   document.getElementById('flag-input').value = '';
   document.getElementById('result-msg').style.display = 'none';
   await loadHints(ch);
   document.getElementById('modal').classList.add('active');
-  setTimeout(() => document.getElementById('flag-input').focus(), 100);
+  setTimeout(()=>document.getElementById('flag-input').focus(),100);
 }
 
 async function loadHints(ch) {
   const section = document.getElementById('hints-section');
   if (!ch.hints?.length) { section.innerHTML = ''; return; }
   const unlocked = token ? await api(`/hints/${ch.id}`) : {unlocked:[]};
-  const unlockedSet = new Set((unlocked.unlocked||[]).map(h => h.hint_index));
+  const unlockedSet = new Set((unlocked.unlocked||[]).map(h=>h.hint_index));
   section.innerHTML = `<div class="hints-title">💡 HINTS (${ch.hints.length} available)</div>` +
     ch.hints.map((hint, i) => {
       const cost = Math.floor(ch.points * 0.1 * (i + 1));
@@ -737,16 +783,16 @@ async function loadHints(ch) {
 }
 
 async function unlockHint(challengeId, hintIndex, cost) {
-  if (!token) return window.location.href = '/login';
+  if (!token) return window.location.href='/login';
   if (!confirm(`Unlock hint for -${cost} points?`)) return;
   const r = await api('/hints/unlock', {
-    method: 'POST',
+    method:'POST',
     body: JSON.stringify({challenge_id: challengeId, hint_index: hintIndex})
   });
   if (r.success) {
     await loadHints(currentChallenge);
   } else {
-    alert(r.message || 'Failed to unlock hint');
+    alert(r.message||'Failed to unlock hint');
   }
 }
 
@@ -760,16 +806,16 @@ async function submitFlag() {
   const flag = document.getElementById('flag-input').value.trim();
   if (!flag) return;
   const r = await fetch('/api/v1/submit', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
-    body: JSON.stringify({challenge_id: currentChallenge.id, flag, team})
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},
+    body: JSON.stringify({challenge_id:currentChallenge.id, flag, team})
   });
   const data = await r.json();
   const msg = document.getElementById('result-msg');
   msg.style.display = 'block';
-  msg.className = 'result-msg ' + (data.correct ? 'correct' : 'wrong');
+  msg.className = 'result-msg '+(data.correct?'correct':'wrong');
   msg.textContent = data.message;
-  if (data.correct) setTimeout(() => { closeModal(); loadChallenges(); loadScoreboard(); loadFeed(); }, 1800);
+  if (data.correct) setTimeout(()=>{closeModal();loadChallenges();loadScoreboard();loadFeed();},1800);
 }
 
 function getCertificate(teamName, rank) {
@@ -777,26 +823,26 @@ function getCertificate(teamName, rank) {
 }
 
 function switchTab(name) {
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
   document.getElementById('panel-'+name).classList.add('active');
-  if (name === 'scoreboard') loadScoreboard();
-  if (name === 'feed') loadFeed();
+  if (name==='scoreboard') loadScoreboard();
+  if (name==='feed') loadFeed();
 }
 
 function logout() {
-  fetch('/api/v1/auth/logout', {method:'POST', headers:{'Authorization':`Bearer ${token}`}});
+  fetch('/api/v1/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}});
   localStorage.clear();
-  window.location.href = '/login';
+  window.location.href='/login';
 }
 
-document.getElementById('flag-input')?.addEventListener('keydown', e => { if (e.key==='Enter') submitFlag(); });
-document.getElementById('modal')?.addEventListener('click', e => { if (e.target===document.getElementById('modal')) closeModal(); });
+document.getElementById('flag-input')?.addEventListener('keydown',e=>{if(e.key==='Enter')submitFlag();});
+document.getElementById('modal')?.addEventListener('click',e=>{if(e.target===document.getElementById('modal'))closeModal();});
 
 loadChallenges();
 loadFeed();
-setInterval(() => { loadScoreboard(); loadFeed(); }, 30000);
+setInterval(()=>{loadScoreboard();loadFeed();},30000);
 </script>
 <script>""" + TIMER_JS + """</script>
 </body>
