@@ -995,34 +995,64 @@ def create_app(config: Config = None) -> Flask:
             cert_id=cert_id)
 
     # ── Debug / Setup Routes (REMOVE AFTER USE) ────────────────────────
+    @app.route("/debug-schema")
+    def debug_schema():
+        try:
+            rows = auth.db.fetchall("""
+                SELECT column_name, data_type
+                FROM information_schema.columns
+                WHERE table_name = 'teams'
+                ORDER BY ordinal_position
+            """)
+            output = "TEAMS TABLE COLUMNS:\n"
+            output += "\n".join([f"  {r[0]} — {r[1]}" for r in rows])
+
+            rows2 = auth.db.fetchall("""
+                SELECT column_name, data_type
+                FROM information_schema.columns
+                WHERE table_name = 'login_attempts'
+                ORDER BY ordinal_position
+            """)
+            output += "\n\nLOGIN_ATTEMPTS TABLE COLUMNS:\n"
+            output += "\n".join([f"  {r[0]} — {r[1]}" for r in rows2])
+
+            rows3 = auth.db.fetchall("""
+                SELECT table_name FROM information_schema.tables
+                WHERE table_schema = 'public'
+                ORDER BY table_name
+            """)
+            output += "\n\nALL TABLES:\n"
+            output += "\n".join([f"  {r[0]}" for r in rows3])
+
+            return f"<pre style='background:#111;color:#0f0;padding:2rem;font-family:monospace'>{output}</pre>"
+        except Exception as e:
+            return f"<pre style='color:red'>Error: {e}\n{traceback.format_exc()}</pre>", 500
+
     @app.route("/fix-schema-now")
     def fix_schema():
-      try:
-        results = []
-        # Add missing columns to teams table
-        fixes = [
-            "ALTER TABLE teams ADD COLUMN IF NOT EXISTS email TEXT DEFAULT ''",
-            "ALTER TABLE teams ADD COLUMN IF NOT EXISTS password_hash TEXT DEFAULT ''",
-            "ALTER TABLE teams ADD COLUMN IF NOT EXISTS verified INTEGER DEFAULT 0",
-            "ALTER TABLE teams ADD COLUMN IF NOT EXISTS banned INTEGER DEFAULT 0",
-        ]
-        for sql in fixes:
-            try:
-                auth.db.execute(sql)
-                results.append(f"OK: {sql}")
-            except Exception as e:
-                results.append(f"SKIP: {sql} — {e}")
+        try:
+            results = []
+            fixes = [
+                "ALTER TABLE teams ADD COLUMN IF NOT EXISTS email TEXT DEFAULT ''",
+                "ALTER TABLE teams ADD COLUMN IF NOT EXISTS password_hash TEXT DEFAULT ''",
+                "ALTER TABLE teams ADD COLUMN IF NOT EXISTS verified INTEGER DEFAULT 0",
+                "ALTER TABLE teams ADD COLUMN IF NOT EXISTS banned INTEGER DEFAULT 0",
+            ]
+            for sql in fixes:
+                try:
+                    auth.db.execute(sql)
+                    results.append(f"OK: {sql}")
+                except Exception as e:
+                    results.append(f"SKIP: {sql} — {e}")
 
-        # Verify final columns
-        cols = auth.db.fetchall("""
-            SELECT column_name FROM information_schema.columns
-            WHERE table_name = 'teams' ORDER BY ordinal_position
-        """)
-        results.append("\nFINAL COLUMNS: " + ", ".join([c[0] for c in cols]))
-
-        return f"<pre style='background:#111;color:#0f0;padding:2rem'>" + "\n".join(results) + "</pre>"
-      except Exception as e:
-        return f"<pre style='color:red'>Error: {e}\n{traceback.format_exc()}</pre>", 500
+            cols = auth.db.fetchall("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name = 'teams' ORDER BY ordinal_position
+            """)
+            results.append("\nFINAL COLUMNS: " + ", ".join([c[0] for c in cols]))
+            return f"<pre style='background:#111;color:#0f0;padding:2rem'>" + "\n".join(results) + "</pre>"
+        except Exception as e:
+            return f"<pre style='color:red'>Error: {e}\n{traceback.format_exc()}</pre>", 500
 
     @app.route("/setup-admin-now")
     def setup_admin():
@@ -1030,20 +1060,13 @@ def create_app(config: Config = None) -> Flask:
             import bcrypt
             admin_name = config.admin_username
             admin_pass = config.admin_password
-
-            # Get actual columns in teams table
             cols = auth.db.fetchall("""
                 SELECT column_name FROM information_schema.columns
                 WHERE table_name = 'teams'
             """)
             col_names = [c[0] for c in cols]
-
-            # Delete existing admin
             auth.db.execute("DELETE FROM teams WHERE name=?", (admin_name,))
-
-            # Build insert based on actual columns
             pw_hash = bcrypt.hashpw(admin_pass.encode(), bcrypt.gensalt()).decode()
-
             if 'email' in col_names:
                 auth.db.execute(
                     "INSERT INTO teams (name, email, password_hash, country, verified, banned) VALUES (?,?,?,?,1,0)",
@@ -1054,7 +1077,6 @@ def create_app(config: Config = None) -> Flask:
                     "INSERT INTO teams (name, password_hash, country, verified, banned) VALUES (?,?,?,1,0)",
                     (admin_name, pw_hash, "")
                 )
-
             return f"<pre style='background:#111;color:#0f0;padding:2rem'>Admin '{admin_name}' recreated!\nPassword: {admin_pass}\nColumns found: {col_names}\n\nNOW DELETE THESE DEBUG ROUTES AND REDEPLOY!</pre>"
         except Exception as e:
             return f"<pre style='color:red'>Error: {e}\n{traceback.format_exc()}</pre>", 500
@@ -1314,6 +1336,9 @@ def create_app(config: Config = None) -> Flask:
     def server_error(e): return jsonify({"error": "Internal server error"}), 500
 
     return app
+
+
+# ── Entry point ────────────────────────────────────────────────────────
 app = create_app()
 
 if __name__ == "__main__":
