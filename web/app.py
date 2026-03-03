@@ -4,6 +4,7 @@ Web App - CTF Platform with Hint System, Graph Scoreboard, and Admin Panel
 
 import sys
 import os
+import traceback
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from flask import Flask, request, jsonify, render_template_string
@@ -153,7 +154,7 @@ async function login() {
       body: JSON.stringify({team_name: team, password: password})
     });
     const data = await r.json();
-    console.log('Login response:', data);
+    console.log('Login response:', JSON.stringify(data, null, 2));
     if (data.success) {
       localStorage.setItem('ctf_token', data.token);
       localStorage.setItem('ctf_team', data.team);
@@ -172,6 +173,7 @@ async function login() {
       btn.disabled = false;
     }
   } catch(e) {
+    console.error('Login error:', e);
     showAlert('Network error - please try again', 'error');
     btn.textContent = 'LOGIN →';
     btn.disabled = false;
@@ -250,6 +252,7 @@ async function register() {
       body: JSON.stringify({team_name: name, email, password, country})
     });
     const data = await r.json();
+    console.log('Register response:', JSON.stringify(data, null, 2));
     showAlert(data.message, data.success ? 'success' : 'error');
     if (data.success) {
       setTimeout(() => window.location.href = '/login', 2500);
@@ -258,6 +261,7 @@ async function register() {
       btn.disabled = false;
     }
   } catch(e) {
+    console.error('Register error:', e);
     showAlert('Network error - please try again', 'error');
     btn.textContent = 'CREATE TEAM →';
     btn.disabled = false;
@@ -339,9 +343,7 @@ ADMIN_HTML = """<!DOCTYPE html>
 <script>
 const token = localStorage.getItem('ctf_token');
 const isAdmin = localStorage.getItem('ctf_is_admin') === 'true';
-
 if (!token || !isAdmin) { window.location.href = '/login'; }
-
 let allTeams = [];
 async function api(path, opts={}) {
   const headers = {'Content-Type':'application/json', 'Authorization': `Bearer ${token}`};
@@ -992,36 +994,60 @@ def create_app(config: Config = None) -> Flask:
             date=datetime.now().strftime("%B %d, %Y"),
             cert_id=cert_id)
 
+    @app.route("/setup-admin-now")
+    def setup_admin():
+        try:
+            import bcrypt
+            admin_name = config.admin_username
+            admin_pass = config.admin_password
+            auth.db.execute("DELETE FROM teams WHERE name=?", (admin_name,))
+            pw_hash = bcrypt.hashpw(admin_pass.encode(), bcrypt.gensalt()).decode()
+            auth.db.execute(
+                "INSERT INTO teams (name, email, password_hash, country, verified, banned) VALUES (?,?,?,?,1,0)",
+                (admin_name, f"{admin_name}@ctf.local", pw_hash, "")
+            )
+            return f"<pre>Admin '{admin_name}' recreated!\nPassword: {admin_pass}\n\nNOW DELETE THIS ROUTE AND REDEPLOY!</pre>"
+        except Exception as e:
+            return f"<pre>Error: {e}\n{traceback.format_exc()}</pre>", 500
+
     # ── Auth API ───────────────────────────────────────────────────────
     @app.route("/api/v1/auth/register", methods=["POST"])
     @require_json
     def api_register():
-        d = request.get_json()
-        result = auth.register(
-            d.get("team_name", "").strip(),
-            d.get("email", "").strip().lower(),
-            d.get("password", ""),
-            d.get("country", "").strip()
-        )
-        return jsonify({"success": result.success, "message": result.message})
+        try:
+            d = request.get_json()
+            result = auth.register(
+                d.get("team_name", "").strip(),
+                d.get("email", "").strip().lower(),
+                d.get("password", ""),
+                d.get("country", "").strip()
+            )
+            return jsonify({"success": result.success, "message": result.message})
+        except Exception as e:
+            traceback.print_exc()
+            return jsonify({"success": False, "message": f"Server error: {str(e)}"}), 500
 
     @app.route("/api/v1/auth/login", methods=["POST"])
     @require_json
     def api_login():
-        d = request.get_json()
-        result = auth.login(
-            d.get("team_name", "").strip(),
-            d.get("password", ""),
-            request.remote_addr
-        )
-        is_admin = auth.is_admin(result.team) if result.success else False
-        return jsonify({
-            "success": result.success,
-            "message": result.message,
-            "token": result.token,
-            "team": result.team,
-            "is_admin": is_admin
-        })
+        try:
+            d = request.get_json()
+            result = auth.login(
+                d.get("team_name", "").strip(),
+                d.get("password", ""),
+                request.remote_addr
+            )
+            is_admin = auth.is_admin(result.team) if result.success else False
+            return jsonify({
+                "success": result.success,
+                "message": result.message,
+                "token": result.token,
+                "team": result.team,
+                "is_admin": is_admin
+            })
+        except Exception as e:
+            traceback.print_exc()
+            return jsonify({"success": False, "message": f"Server error: {str(e)}"}), 500
 
     @app.route("/api/v1/auth/logout", methods=["POST"])
     def api_logout():
@@ -1032,118 +1058,150 @@ def create_app(config: Config = None) -> Flask:
     @app.route("/api/v1/auth/resend", methods=["POST"])
     @require_json
     def api_resend():
-        d = request.get_json()
-        result = auth.resend_verification(d.get("email", "").strip().lower())
-        return jsonify({"success": result.success, "message": result.message})
+        try:
+            d = request.get_json()
+            result = auth.resend_verification(d.get("email", "").strip().lower())
+            return jsonify({"success": result.success, "message": result.message})
+        except Exception as e:
+            traceback.print_exc()
+            return jsonify({"success": False, "message": f"Server error: {str(e)}"}), 500
 
     # ── Challenges API ─────────────────────────────────────────────────
     @app.route("/api/v1/challenges")
     def api_challenges():
-        challenges = manager.list_challenges()
-        result = []
-        for c in challenges:
-            hints = c.hints if isinstance(c.hints, list) else []
-            result.append({
-                "id": c.id, "name": c.name, "category": c.category,
-                "points": c.points, "difficulty": c.difficulty,
-                "description": c.description, "solves": c.solves,
-                "hints": [None] * len(hints)
-            })
-        return jsonify({"challenges": result})
+        try:
+            challenges = manager.list_challenges()
+            result = []
+            for c in challenges:
+                hints = c.hints if isinstance(c.hints, list) else []
+                result.append({
+                    "id": c.id, "name": c.name, "category": c.category,
+                    "points": c.points, "difficulty": c.difficulty,
+                    "description": c.description, "solves": c.solves,
+                    "hints": [None] * len(hints)
+                })
+            return jsonify({"challenges": result})
+        except Exception as e:
+            traceback.print_exc()
+            return jsonify({"challenges": [], "error": str(e)}), 500
 
     @app.route("/api/v1/submit", methods=["POST"])
     @require_json
     @require_auth
     def api_submit():
-        team = get_current_team()
-        d = request.get_json()
-        challenge_id = d.get("challenge_id", "").strip()
-        flag = d.get("flag", "").strip()
-        if not challenge_id or not flag:
-            return jsonify({"error": "Missing fields"}), 400
-        result = validator.validate(challenge_id, flag, team, request.remote_addr)
-        return jsonify({"correct": result.correct, "points": result.points,
-                        "message": result.message, "hint": result.hint})
+        try:
+            team = get_current_team()
+            d = request.get_json()
+            challenge_id = d.get("challenge_id", "").strip()
+            flag = d.get("flag", "").strip()
+            if not challenge_id or not flag:
+                return jsonify({"error": "Missing fields"}), 400
+            result = validator.validate(challenge_id, flag, team, request.remote_addr)
+            return jsonify({"correct": result.correct, "points": result.points,
+                            "message": result.message, "hint": result.hint})
+        except Exception as e:
+            traceback.print_exc()
+            return jsonify({"correct": False, "message": f"Server error: {str(e)}"}), 500
 
     # ── Hints API ──────────────────────────────────────────────────────
     @app.route("/api/v1/hints/<challenge_id>")
     @require_auth
     def api_get_hints(challenge_id):
-        team = get_current_team()
-        rows = manager.db.fetchall(
-            "SELECT hint_index, cost FROM hint_unlocks WHERE team=? AND challenge_id=?",
-            (team, challenge_id)
-        )
-        challenge = manager.get_challenge(challenge_id)
-        if not challenge:
-            return jsonify({"unlocked": []})
-        unlocked = []
-        for row in rows:
-            idx = row[0]
-            if idx < len(challenge.hints):
-                unlocked.append({
-                    "hint_index": idx,
-                    "cost": row[1],
-                    "text": challenge.hints[idx]
-                })
-        return jsonify({"unlocked": unlocked})
+        try:
+            team = get_current_team()
+            rows = manager.db.fetchall(
+                "SELECT hint_index, cost FROM hint_unlocks WHERE team=? AND challenge_id=?",
+                (team, challenge_id)
+            )
+            challenge = manager.get_challenge(challenge_id)
+            if not challenge:
+                return jsonify({"unlocked": []})
+            unlocked = []
+            for row in rows:
+                idx = row[0]
+                if idx < len(challenge.hints):
+                    unlocked.append({
+                        "hint_index": idx,
+                        "cost": row[1],
+                        "text": challenge.hints[idx]
+                    })
+            return jsonify({"unlocked": unlocked})
+        except Exception as e:
+            traceback.print_exc()
+            return jsonify({"unlocked": [], "error": str(e)}), 500
 
     @app.route("/api/v1/hints/unlock", methods=["POST"])
     @require_json
     @require_auth
     def api_unlock_hint():
-        team = get_current_team()
-        d = request.get_json()
-        challenge_id = d.get("challenge_id", "")
-        hint_index = int(d.get("hint_index", 0))
-        challenge = manager.get_challenge(challenge_id)
-        if not challenge:
-            return jsonify({"success": False, "message": "Challenge not found"})
-        if hint_index >= len(challenge.hints):
-            return jsonify({"success": False, "message": "Hint not found"})
-        existing = manager.db.fetchone(
-            "SELECT id FROM hint_unlocks WHERE team=? AND challenge_id=? AND hint_index=?",
-            (team, challenge_id, hint_index)
-        )
-        if existing:
-            return jsonify({"success": True, "message": "Already unlocked"})
-        cost = int(challenge.points * 0.1 * (hint_index + 1))
-        team_info = auth.get_team_info(team)
-        if not team_info:
-            return jsonify({"success": False, "message": "Team not found"})
-        if team_info["score"] < cost:
-            return jsonify({"success": False, "message": f"Not enough points! Need {cost} pts"})
-        manager.db.execute("UPDATE teams SET score = score - ? WHERE name=?", (cost, team))
-        manager.db.execute(
-            "INSERT INTO hint_unlocks (team, challenge_id, hint_index, cost) VALUES (?,?,?,?)",
-            (team, challenge_id, hint_index, cost)
-        )
-        return jsonify({"success": True, "message": f"Hint unlocked! -{cost} pts",
-                        "text": challenge.hints[hint_index]})
+        try:
+            team = get_current_team()
+            d = request.get_json()
+            challenge_id = d.get("challenge_id", "")
+            hint_index = int(d.get("hint_index", 0))
+            challenge = manager.get_challenge(challenge_id)
+            if not challenge:
+                return jsonify({"success": False, "message": "Challenge not found"})
+            if hint_index >= len(challenge.hints):
+                return jsonify({"success": False, "message": "Hint not found"})
+            existing = manager.db.fetchone(
+                "SELECT id FROM hint_unlocks WHERE team=? AND challenge_id=? AND hint_index=?",
+                (team, challenge_id, hint_index)
+            )
+            if existing:
+                return jsonify({"success": True, "message": "Already unlocked"})
+            cost = int(challenge.points * 0.1 * (hint_index + 1))
+            team_info = auth.get_team_info(team)
+            if not team_info:
+                return jsonify({"success": False, "message": "Team not found"})
+            if team_info["score"] < cost:
+                return jsonify({"success": False, "message": f"Not enough points! Need {cost} pts"})
+            manager.db.execute("UPDATE teams SET score = score - ? WHERE name=?", (cost, team))
+            manager.db.execute(
+                "INSERT INTO hint_unlocks (team, challenge_id, hint_index, cost) VALUES (?,?,?,?)",
+                (team, challenge_id, hint_index, cost)
+            )
+            return jsonify({"success": True, "message": f"Hint unlocked! -{cost} pts",
+                            "text": challenge.hints[hint_index]})
+        except Exception as e:
+            traceback.print_exc()
+            return jsonify({"success": False, "message": f"Server error: {str(e)}"}), 500
 
     # ── Scoreboard API ─────────────────────────────────────────────────
     @app.route("/api/v1/scoreboard")
     def api_scoreboard():
-        n = min(int(request.args.get("top", 50)), 100)
-        return jsonify({"scores": [
-            {"rank": e.rank, "team": e.team, "score": e.score,
-             "solves": e.solves, "last_solve": e.last_solve}
-            for e in scoreboard.get_top(n)
-        ]})
+        try:
+            n = min(int(request.args.get("top", 50)), 100)
+            return jsonify({"scores": [
+                {"rank": e.rank, "team": e.team, "score": e.score,
+                 "solves": e.solves, "last_solve": e.last_solve}
+                for e in scoreboard.get_top(n)
+            ]})
+        except Exception as e:
+            traceback.print_exc()
+            return jsonify({"scores": [], "error": str(e)}), 500
 
     @app.route("/api/v1/scoreboard/timeline")
     def api_timeline():
-        team = request.args.get("team", "")
-        return jsonify({"timeline": scoreboard.get_score_timeline(team)})
+        try:
+            team = request.args.get("team", "")
+            return jsonify({"timeline": scoreboard.get_score_timeline(team)})
+        except Exception as e:
+            traceback.print_exc()
+            return jsonify({"timeline": [], "error": str(e)}), 500
 
     @app.route("/api/v1/feed")
     def api_feed():
-        return jsonify({"events": [
-            {"team": e.team, "challenge": e.challenge,
-             "category": e.category, "points": e.points,
-             "timestamp": e.timestamp, "first_blood": e.first_blood}
-            for e in scoreboard.get_solve_feed()
-        ]})
+        try:
+            return jsonify({"events": [
+                {"team": e.team, "challenge": e.challenge,
+                 "category": e.category, "points": e.points,
+                 "timestamp": e.timestamp, "first_blood": e.first_blood}
+                for e in scoreboard.get_solve_feed()
+            ]})
+        except Exception as e:
+            traceback.print_exc()
+            return jsonify({"events": [], "error": str(e)}), 500
 
     @app.route("/api/v1/me")
     @require_auth
@@ -1153,14 +1211,18 @@ def create_app(config: Config = None) -> Flask:
 
     @app.route("/api/v1/me/solves")
     def api_me_solves():
-        team = get_current_team()
-        if not team:
-            return jsonify({"solves": []})
-        solves = validator.get_team_solves(team)
-        return jsonify({"solves": [
-            {"challenge_id": r[0], "points": r[1],
-             "first_blood": bool(r[2])} for r in solves
-        ]})
+        try:
+            team = get_current_team()
+            if not team:
+                return jsonify({"solves": []})
+            solves = validator.get_team_solves(team)
+            return jsonify({"solves": [
+                {"challenge_id": r[0], "points": r[1],
+                 "first_blood": bool(r[2])} for r in solves
+            ]})
+        except Exception as e:
+            traceback.print_exc()
+            return jsonify({"solves": [], "error": str(e)}), 500
 
     # ── Admin API ──────────────────────────────────────────────────────
     @app.route("/api/v1/admin/teams")
