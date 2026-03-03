@@ -33,7 +33,7 @@ class AuthManager:
     def _ensure_schema(self):
         self.db.execute("""
             CREATE TABLE IF NOT EXISTS teams (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id SERIAL PRIMARY KEY,
                 name TEXT UNIQUE NOT NULL,
                 email TEXT UNIQUE NOT NULL,
                 password_hash TEXT NOT NULL,
@@ -43,25 +43,32 @@ class AuthManager:
                 verified INTEGER DEFAULT 0,
                 banned INTEGER DEFAULT 0,
                 last_solve REAL DEFAULT 0,
-                created_at REAL DEFAULT (strftime('%s', 'now'))
+                created_at REAL DEFAULT (EXTRACT(EPOCH FROM NOW()))
             )
         """)
         self.db.execute("""
             CREATE TABLE IF NOT EXISTS sessions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id SERIAL PRIMARY KEY,
                 team TEXT NOT NULL,
                 token TEXT UNIQUE NOT NULL,
-                created_at REAL DEFAULT (strftime('%s', 'now')),
+                created_at REAL DEFAULT (EXTRACT(EPOCH FROM NOW())),
                 expires_at REAL NOT NULL
             )
         """)
         self.db.execute("""
             CREATE TABLE IF NOT EXISTS login_attempts (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                ip TEXT NOT NULL,
-                attempted_at REAL DEFAULT (strftime('%s', 'now'))
+                id SERIAL PRIMARY KEY,
+                ip_address TEXT NOT NULL,
+                attempted_at REAL DEFAULT (EXTRACT(EPOCH FROM NOW()))
             )
         """)
+        # Fix old schema if ip column exists instead of ip_address
+        try:
+            self.db.execute(
+                "ALTER TABLE login_attempts ADD COLUMN IF NOT EXISTS ip_address TEXT"
+            )
+        except:
+            pass
 
     def register(self, team_name: str, email: str, password: str, country: str = "") -> AuthResult:
         if not team_name or len(team_name) < 2:
@@ -147,14 +154,17 @@ class AuthManager:
 
     def login(self, team_name: str, password: str, ip: str = "0.0.0.0") -> AuthResult:
         now = time.time()
-        attempts = self.db.fetchall(
-            "SELECT id FROM login_attempts WHERE ip=? AND attempted_at > ?",
-            (ip, now - 300)
-        )
-        if len(attempts) >= 5:
-            return AuthResult(False, "Too many login attempts. Try again in 5 minutes.")
-
-        self.db.execute("INSERT INTO login_attempts (ip) VALUES (?)", (ip,))
+        # Bruteforce protection
+        try:
+            attempts = self.db.fetchall(
+                "SELECT id FROM login_attempts WHERE ip_address=? AND attempted_at > ?",
+                (ip, now - 300)
+            )
+            if len(attempts) >= 5:
+                return AuthResult(False, "Too many login attempts. Try again in 5 minutes.")
+            self.db.execute("INSERT INTO login_attempts (ip_address) VALUES (?)", (ip,))
+        except Exception as e:
+            print(f"[AUTH] Rate limit check failed: {e}")
 
         row = self.db.fetchone(
             "SELECT name, password_hash, verified, banned FROM teams WHERE name=?",
