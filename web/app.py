@@ -995,38 +995,34 @@ def create_app(config: Config = None) -> Flask:
             cert_id=cert_id)
 
     # ── Debug / Setup Routes (REMOVE AFTER USE) ────────────────────────
-    @app.route("/debug-schema")
-    def debug_schema():
-        try:
-            rows = auth.db.fetchall("""
-                SELECT column_name, data_type
-                FROM information_schema.columns
-                WHERE table_name = 'teams'
-                ORDER BY ordinal_position
-            """)
-            output = "TEAMS TABLE COLUMNS:\n"
-            output += "\n".join([f"  {r[0]} — {r[1]}" for r in rows])
+    @app.route("/fix-schema-now")
+    def fix_schema():
+      try:
+        results = []
+        # Add missing columns to teams table
+        fixes = [
+            "ALTER TABLE teams ADD COLUMN IF NOT EXISTS email TEXT DEFAULT ''",
+            "ALTER TABLE teams ADD COLUMN IF NOT EXISTS password_hash TEXT DEFAULT ''",
+            "ALTER TABLE teams ADD COLUMN IF NOT EXISTS verified INTEGER DEFAULT 0",
+            "ALTER TABLE teams ADD COLUMN IF NOT EXISTS banned INTEGER DEFAULT 0",
+        ]
+        for sql in fixes:
+            try:
+                auth.db.execute(sql)
+                results.append(f"OK: {sql}")
+            except Exception as e:
+                results.append(f"SKIP: {sql} — {e}")
 
-            rows2 = auth.db.fetchall("""
-                SELECT column_name, data_type
-                FROM information_schema.columns
-                WHERE table_name = 'login_attempts'
-                ORDER BY ordinal_position
-            """)
-            output += "\n\nLOGIN_ATTEMPTS TABLE COLUMNS:\n"
-            output += "\n".join([f"  {r[0]} — {r[1]}" for r in rows2])
+        # Verify final columns
+        cols = auth.db.fetchall("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'teams' ORDER BY ordinal_position
+        """)
+        results.append("\nFINAL COLUMNS: " + ", ".join([c[0] for c in cols]))
 
-            rows3 = auth.db.fetchall("""
-                SELECT table_name FROM information_schema.tables
-                WHERE table_schema = 'public'
-                ORDER BY table_name
-            """)
-            output += "\n\nALL TABLES:\n"
-            output += "\n".join([f"  {r[0]}" for r in rows3])
-
-            return f"<pre style='background:#111;color:#0f0;padding:2rem;font-family:monospace'>{output}</pre>"
-        except Exception as e:
-            return f"<pre style='color:red'>Error: {e}\n{traceback.format_exc()}</pre>", 500
+        return f"<pre style='background:#111;color:#0f0;padding:2rem'>" + "\n".join(results) + "</pre>"
+      except Exception as e:
+        return f"<pre style='color:red'>Error: {e}\n{traceback.format_exc()}</pre>", 500
 
     @app.route("/setup-admin-now")
     def setup_admin():
@@ -1322,4 +1318,3 @@ app = create_app()
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
-    
