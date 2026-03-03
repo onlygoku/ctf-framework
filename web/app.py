@@ -994,21 +994,74 @@ def create_app(config: Config = None) -> Flask:
             date=datetime.now().strftime("%B %d, %Y"),
             cert_id=cert_id)
 
+    # ── Debug / Setup Routes (REMOVE AFTER USE) ────────────────────────
+    @app.route("/debug-schema")
+    def debug_schema():
+        try:
+            rows = auth.db.fetchall("""
+                SELECT column_name, data_type
+                FROM information_schema.columns
+                WHERE table_name = 'teams'
+                ORDER BY ordinal_position
+            """)
+            output = "TEAMS TABLE COLUMNS:\n"
+            output += "\n".join([f"  {r[0]} — {r[1]}" for r in rows])
+
+            rows2 = auth.db.fetchall("""
+                SELECT column_name, data_type
+                FROM information_schema.columns
+                WHERE table_name = 'login_attempts'
+                ORDER BY ordinal_position
+            """)
+            output += "\n\nLOGIN_ATTEMPTS TABLE COLUMNS:\n"
+            output += "\n".join([f"  {r[0]} — {r[1]}" for r in rows2])
+
+            rows3 = auth.db.fetchall("""
+                SELECT table_name FROM information_schema.tables
+                WHERE table_schema = 'public'
+                ORDER BY table_name
+            """)
+            output += "\n\nALL TABLES:\n"
+            output += "\n".join([f"  {r[0]}" for r in rows3])
+
+            return f"<pre style='background:#111;color:#0f0;padding:2rem;font-family:monospace'>{output}</pre>"
+        except Exception as e:
+            return f"<pre style='color:red'>Error: {e}\n{traceback.format_exc()}</pre>", 500
+
     @app.route("/setup-admin-now")
     def setup_admin():
         try:
             import bcrypt
             admin_name = config.admin_username
             admin_pass = config.admin_password
+
+            # Get actual columns in teams table
+            cols = auth.db.fetchall("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name = 'teams'
+            """)
+            col_names = [c[0] for c in cols]
+
+            # Delete existing admin
             auth.db.execute("DELETE FROM teams WHERE name=?", (admin_name,))
+
+            # Build insert based on actual columns
             pw_hash = bcrypt.hashpw(admin_pass.encode(), bcrypt.gensalt()).decode()
-            auth.db.execute(
-                "INSERT INTO teams (name, email, password_hash, country, verified, banned) VALUES (?,?,?,?,1,0)",
-                (admin_name, f"{admin_name}@ctf.local", pw_hash, "")
-            )
-            return f"<pre>Admin '{admin_name}' recreated!\nPassword: {admin_pass}\n\nNOW DELETE THIS ROUTE AND REDEPLOY!</pre>"
+
+            if 'email' in col_names:
+                auth.db.execute(
+                    "INSERT INTO teams (name, email, password_hash, country, verified, banned) VALUES (?,?,?,?,1,0)",
+                    (admin_name, f"{admin_name}@ctf.local", pw_hash, "")
+                )
+            else:
+                auth.db.execute(
+                    "INSERT INTO teams (name, password_hash, country, verified, banned) VALUES (?,?,?,1,0)",
+                    (admin_name, pw_hash, "")
+                )
+
+            return f"<pre style='background:#111;color:#0f0;padding:2rem'>Admin '{admin_name}' recreated!\nPassword: {admin_pass}\nColumns found: {col_names}\n\nNOW DELETE THESE DEBUG ROUTES AND REDEPLOY!</pre>"
         except Exception as e:
-            return f"<pre>Error: {e}\n{traceback.format_exc()}</pre>", 500
+            return f"<pre style='color:red'>Error: {e}\n{traceback.format_exc()}</pre>", 500
 
     # ── Auth API ───────────────────────────────────────────────────────
     @app.route("/api/v1/auth/register", methods=["POST"])
