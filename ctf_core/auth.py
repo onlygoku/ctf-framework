@@ -6,7 +6,6 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from dataclasses import dataclass
 from typing import Optional
-from collections import defaultdict
 
 import bcrypt
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
@@ -28,47 +27,6 @@ class AuthManager:
         self.config = config or Config()
         self.db = Database(self.config.db_path)
         self.serializer = URLSafeTimedSerializer(self.config.secret_key)
-        self._ensure_schema()
-
-    def _ensure_schema(self):
-        self.db.execute("""
-            CREATE TABLE IF NOT EXISTS teams (
-                id SERIAL PRIMARY KEY,
-                name TEXT UNIQUE NOT NULL,
-                email TEXT UNIQUE NOT NULL,
-                password_hash TEXT NOT NULL,
-                score INTEGER DEFAULT 0,
-                solves INTEGER DEFAULT 0,
-                country TEXT DEFAULT '',
-                verified INTEGER DEFAULT 0,
-                banned INTEGER DEFAULT 0,
-                last_solve REAL DEFAULT 0,
-                created_at REAL DEFAULT (EXTRACT(EPOCH FROM NOW()))
-            )
-        """)
-        self.db.execute("""
-            CREATE TABLE IF NOT EXISTS sessions (
-                id SERIAL PRIMARY KEY,
-                team TEXT NOT NULL,
-                token TEXT UNIQUE NOT NULL,
-                created_at REAL DEFAULT (EXTRACT(EPOCH FROM NOW())),
-                expires_at REAL NOT NULL
-            )
-        """)
-        self.db.execute("""
-            CREATE TABLE IF NOT EXISTS login_attempts (
-                id SERIAL PRIMARY KEY,
-                ip_address TEXT NOT NULL,
-                attempted_at REAL DEFAULT (EXTRACT(EPOCH FROM NOW()))
-            )
-        """)
-        # Fix old schema if ip column exists instead of ip_address
-        try:
-            self.db.execute(
-                "ALTER TABLE login_attempts ADD COLUMN IF NOT EXISTS ip_address TEXT"
-            )
-        except:
-            pass
 
     def register(self, team_name: str, email: str, password: str, country: str = "") -> AuthResult:
         if not team_name or len(team_name) < 2:
@@ -154,7 +112,7 @@ class AuthManager:
 
     def login(self, team_name: str, password: str, ip: str = "0.0.0.0") -> AuthResult:
         now = time.time()
-        # Bruteforce protection
+        # Bruteforce protection - use actual column name ip_address
         try:
             attempts = self.db.fetchall(
                 "SELECT id FROM login_attempts WHERE ip_address=? AND attempted_at > ?",
@@ -162,7 +120,10 @@ class AuthManager:
             )
             if len(attempts) >= 5:
                 return AuthResult(False, "Too many login attempts. Try again in 5 minutes.")
-            self.db.execute("INSERT INTO login_attempts (ip_address) VALUES (?)", (ip,))
+            self.db.execute(
+                "INSERT INTO login_attempts (ip_address, team_name, success) VALUES (?,?,0)",
+                (ip, team_name)
+            )
         except Exception as e:
             print(f"[AUTH] Rate limit check failed: {e}")
 
@@ -182,10 +143,11 @@ class AuthManager:
         if not verified:
             return AuthResult(False, "Please verify your email before logging in.")
 
+        # Use actual column name team_name in sessions
         token = secrets.token_hex(32)
         expires = now + 86400
         self.db.execute(
-            "INSERT INTO sessions (team, token, expires_at) VALUES (?,?,?)",
+            "INSERT INTO sessions (team_name, token, expires_at) VALUES (?,?,?)",
             (name, token, expires)
         )
         return AuthResult(True, "Login successful!", token=token, team=name)
@@ -194,7 +156,7 @@ class AuthManager:
         if not token:
             return None
         row = self.db.fetchone(
-            "SELECT team FROM sessions WHERE token=? AND expires_at > ?",
+            "SELECT team_name FROM sessions WHERE token=? AND expires_at > ?",
             (token, time.time())
         )
         return row[0] if row else None
@@ -229,14 +191,14 @@ class AuthManager:
 
     def ban_team(self, name: str):
         self.db.execute("UPDATE teams SET banned=1 WHERE name=?", (name,))
-        self.db.execute("DELETE FROM sessions WHERE team=?", (name,))
+        self.db.execute("DELETE FROM sessions WHERE team_name=?", (name,))
 
     def unban_team(self, name: str):
         self.db.execute("UPDATE teams SET banned=0 WHERE name=?", (name,))
 
     def delete_team(self, name: str):
         self.db.execute("DELETE FROM solves WHERE team=?", (name,))
-        self.db.execute("DELETE FROM sessions WHERE team=?", (name,))
+        self.db.execute("DELETE FROM sessions WHERE team_name=?", (name,))
         self.db.execute("DELETE FROM hint_unlocks WHERE team=?", (name,))
         self.db.execute("DELETE FROM submissions WHERE team=?", (name,))
         self.db.execute("DELETE FROM teams WHERE name=?", (name,))
