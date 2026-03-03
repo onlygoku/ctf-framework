@@ -119,25 +119,34 @@ LOGIN_HTML = """<!DOCTYPE html>
 async function login() {
   const team = document.getElementById('team').value.trim();
   const password = document.getElementById('password').value;
-  document.querySelectorAll('.alert').forEach(m=>m.remove());
-  if (!team||!password) return showAlert('Fill in all fields','error');
-  const r = await fetch('/api/v1/auth/login',{
-    method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({team_name:team,password})
+  document.querySelectorAll('.alert').forEach(m => m.remove());
+  if (!team || !password) return showAlert('Fill in all fields', 'error');
+
+  const r = await fetch('/api/v1/auth/login', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({team_name: team, password: password})
   });
   const data = await r.json();
+
   if (data.success) {
-    localStorage.setItem('ctf_token',data.token);
-    localStorage.setItem('ctf_team',data.team);
-    localStorage.setItem('ctf_is_admin',data.is_admin);
-    window.location.href = data.is_admin ? '/admin' : '/';
-  } else { showAlert(data.message,'error'); }
+    localStorage.setItem('ctf_token', data.token);
+    localStorage.setItem('ctf_team', data.team);
+    localStorage.setItem('ctf_is_admin', data.is_admin === true ? 'true' : 'false');
+    if (data.is_admin === true) {
+      window.location.href = '/admin';
+    } else {
+      window.location.href = '/';
+    }
+  } else {
+    showAlert(data.message || 'Login failed', 'error');
+  }
 }
-function showAlert(msg,type) {
+function showAlert(msg, type) {
   document.querySelector('.card').insertAdjacentHTML('afterbegin',
     `<div class="alert alert-${type}">${msg}</div>`);
 }
-document.addEventListener('keydown',e=>{if(e.key==='Enter')login();});
+document.addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
 </script></body></html>"""
 
 REGISTER_HTML = """<!DOCTYPE html>
@@ -164,28 +173,29 @@ REGISTER_HTML = """<!DOCTYPE html>
 </div></div>
 <script>
 async function register() {
-  const name=document.getElementById('name').value.trim();
-  const email=document.getElementById('email').value.trim();
-  const password=document.getElementById('password').value;
-  const confirm=document.getElementById('confirm').value;
-  const country=document.getElementById('country').value.trim();
-  document.querySelectorAll('.alert').forEach(m=>m.remove());
-  if(!name||!email||!password) return showAlert('Fill in all required fields','error');
-  if(password!==confirm) return showAlert('Passwords do not match','error');
-  if(password.length<8) return showAlert('Password must be at least 8 characters','error');
-  const r=await fetch('/api/v1/auth/register',{
-    method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({team_name:name,email,password,country})
+  const name = document.getElementById('name').value.trim();
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  const confirm = document.getElementById('confirm').value;
+  const country = document.getElementById('country').value.trim();
+  document.querySelectorAll('.alert').forEach(m => m.remove());
+  if (!name || !email || !password) return showAlert('Fill in all required fields', 'error');
+  if (password !== confirm) return showAlert('Passwords do not match', 'error');
+  if (password.length < 8) return showAlert('Password must be at least 8 characters', 'error');
+  const r = await fetch('/api/v1/auth/register', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({team_name: name, email, password, country})
   });
-  const data=await r.json();
-  showAlert(data.message,data.success?'success':'error');
-  if(data.success) setTimeout(()=>window.location.href='/login',2000);
+  const data = await r.json();
+  showAlert(data.message, data.success ? 'success' : 'error');
+  if (data.success) setTimeout(() => window.location.href = '/login', 2000);
 }
-function showAlert(msg,type){
+function showAlert(msg, type) {
   document.querySelector('.card').insertAdjacentHTML('afterbegin',
     `<div class="alert alert-${type}">${msg}</div>`);
 }
-document.addEventListener('keydown',e=>{if(e.key==='Enter')register();});
+document.addEventListener('keydown', e => { if (e.key === 'Enter') register(); });
 </script></body></html>"""
 
 VERIFY_HTML = """<!DOCTYPE html>
@@ -262,20 +272,28 @@ ADMIN_HTML = """<!DOCTYPE html>
 const token = localStorage.getItem('ctf_token');
 const isAdmin = localStorage.getItem('ctf_is_admin') === 'true';
 
-if (!token || !isAdmin) { window.location.href = '/login'; }
+if (!token || !isAdmin) {
+  window.location.href = '/login';
+}
 
 let allTeams = [];
-async function api(path,opts={}) {
-  const headers={'Content-Type':'application/json','Authorization':`Bearer ${token}`};
-  const r = await fetch('/api/v1'+path,{headers,...opts});
-  if (r.status === 401 || r.status === 403) { window.location.href='/login'; return {}; }
+
+async function api(path, opts={}) {
+  const headers = {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`};
+  const r = await fetch('/api/v1' + path, {headers, ...opts});
+  if (r.status === 401 || r.status === 403) {
+    localStorage.clear();
+    window.location.href = '/login';
+    return {};
+  }
   return r.json();
 }
+
 async function loadStats() {
-  const [teams,challenges,feed] = await Promise.all([
+  const [teams, challenges, feed] = await Promise.all([
     api('/admin/teams'), api('/challenges'), api('/feed')
   ]);
-  allTeams = teams.teams||[];
+  allTeams = teams.teams || [];
   document.getElementById('stat-teams').textContent = allTeams.length;
   document.getElementById('stat-challenges').textContent = (challenges.challenges||[]).length;
   document.getElementById('stat-solves').textContent = (feed.events||[]).length;
@@ -299,6 +317,7 @@ async function loadStats() {
     <td>${e.first_blood?'🩸 YES':''}</td>
   </tr>`).join('');
 }
+
 function renderTeams(teams) {
   document.getElementById('teams-body').innerHTML = teams.map(t=>`<tr>
     <td style="color:#eef;font-weight:bold">${t.name}</td>
@@ -320,43 +339,50 @@ function renderTeams(teams) {
     </td>
   </tr>`).join('');
 }
+
 function filterTeams() {
   const q = document.getElementById('search').value.toLowerCase();
-  renderTeams(allTeams.filter(t=>t.name.toLowerCase().includes(q)||t.email.toLowerCase().includes(q)));
+  renderTeams(allTeams.filter(t =>
+    t.name.toLowerCase().includes(q) || t.email.toLowerCase().includes(q)
+  ));
 }
+
 async function banTeam(name) {
-  if(!confirm(`Ban team "${name}"? They will be logged out immediately.`)) return;
-  await api('/admin/teams/ban',{method:'POST',body:JSON.stringify({team_name:name})});
+  if (!confirm(`Ban team "${name}"? They will be logged out immediately.`)) return;
+  await api('/admin/teams/ban', {method:'POST', body:JSON.stringify({team_name:name})});
   loadStats();
 }
 async function unbanTeam(name) {
-  if(!confirm(`Unban team "${name}"?`)) return;
-  await api('/admin/teams/unban',{method:'POST',body:JSON.stringify({team_name:name})});
+  if (!confirm(`Unban team "${name}"?`)) return;
+  await api('/admin/teams/unban', {method:'POST', body:JSON.stringify({team_name:name})});
   loadStats();
 }
 async function resetScore(name) {
-  if(!confirm(`Reset ALL scores and solves for "${name}"?`)) return;
-  await api('/admin/teams/reset',{method:'POST',body:JSON.stringify({team_name:name})});
+  if (!confirm(`Reset ALL scores and solves for "${name}"?`)) return;
+  await api('/admin/teams/reset', {method:'POST', body:JSON.stringify({team_name:name})});
   loadStats();
 }
 async function deleteTeam(name) {
-  if(!confirm(`PERMANENTLY DELETE team "${name}"?\n\nThis will remove all their solves, hints, and sessions. This CANNOT be undone.`)) return;
-  await api('/admin/teams/delete',{method:'POST',body:JSON.stringify({team_name:name})});
+  if (!confirm(`PERMANENTLY DELETE team "${name}"?\n\nThis cannot be undone.`)) return;
+  await api('/admin/teams/delete', {method:'POST', body:JSON.stringify({team_name:name})});
   loadStats();
 }
+
 function switchTab(name) {
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
   document.getElementById('panel-'+name).classList.add('active');
 }
+
 function logout() {
-  fetch('/api/v1/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}});
+  fetch('/api/v1/auth/logout', {method:'POST', headers:{'Authorization':`Bearer ${token}`}});
   localStorage.clear();
-  window.location.href='/login';
+  window.location.href = '/login';
 }
+
 loadStats();
-setInterval(loadStats,30000);
+setInterval(loadStats, 30000);
 </script></body></html>"""
 
 INDEX_HTML = """<!DOCTYPE html>
@@ -538,15 +564,15 @@ if (token && team) {
 }
 
 async function api(path, opts={}) {
-  const headers = {'Content-Type':'application/json'};
+  const headers = {'Content-Type': 'application/json'};
   if (token) headers['Authorization'] = `Bearer ${token}`;
-  return (await fetch('/api/v1'+path, {headers,...opts})).json();
+  return (await fetch('/api/v1' + path, {headers, ...opts})).json();
 }
 
 async function loadChallenges() {
   const data = await api('/challenges');
   const myData = token ? await api('/me/solves') : {solves:[]};
-  const mySolves = new Set((myData.solves||[]).map(s=>s.challenge_id));
+  const mySolves = new Set((myData.solves||[]).map(s => s.challenge_id));
   const grid = document.getElementById('challenges-grid');
   const prompt = document.getElementById('login-prompt-box');
 
@@ -575,7 +601,7 @@ async function loadChallenges() {
     hdr.style.cssText = 'grid-column:1/-1;font-size:.75rem;letter-spacing:.2em;color:var(--blue);padding:.5rem 0;border-bottom:1px solid var(--border);margin-bottom:.5rem;';
     hdr.textContent = `// ${cat.toUpperCase()}`;
     grid.appendChild(hdr);
-    chs.sort((a,b)=>a.points-b.points).forEach(ch => {
+    chs.sort((a,b) => a.points - b.points).forEach(ch => {
       const solved = mySolves.has(ch.id);
       const card = document.createElement('div');
       card.className = 'challenge-card';
@@ -593,7 +619,7 @@ async function loadChallenges() {
         <div class="ch-desc">${ch.description||''}</div>
         <div class="ch-solves">${ch.solves} solve${ch.solves!==1?'s':''}</div>
         ${ch.hints?.length ? `<div class="ch-hints">💡 ${ch.hints.length} hints available</div>` : ''}`;
-      card.onclick = () => token ? openModal(ch) : window.location.href='/login';
+      card.onclick = () => token ? openModal(ch) : window.location.href = '/login';
       grid.appendChild(card);
     });
   });
@@ -602,13 +628,13 @@ async function loadChallenges() {
 async function loadScoreboard() {
   const data = await api('/scoreboard');
   const ranks = ['🥇','🥈','🥉'];
-  document.getElementById('stat-teams').textContent = data.scores?.length||0;
+  document.getElementById('stat-teams').textContent = data.scores?.length || 0;
   const tbody = document.getElementById('scoreboard-body');
   if (!data.scores?.length) {
     tbody.innerHTML = '<tr><td colspan="6" style="color:#4a8a6a;padding:1rem;">No teams yet.</td></tr>';
     return;
   }
-  tbody.innerHTML = data.scores.map((e,i)=>`<tr>
+  tbody.innerHTML = data.scores.map((e,i) => `<tr>
     <td style="color:${i===0?'#ffd700':i===1?'#c0c0c0':i===2?'#cd7f32':'#cde'}">${ranks[i]||(i+1)}</td>
     <td style="font-weight:bold">${e.team}</td>
     <td style="color:var(--green);font-family:Orbitron,sans-serif">${e.score}</td>
@@ -626,7 +652,7 @@ async function drawScoreGraph(topTeams) {
   const colors = ['#00ff88','#00d4ff','#ff003c','#ffb800','#aa00ff'];
   const datasets = topTeams.map((t,i) => ({
     label: t.team,
-    data: (timelines[i].timeline||[]).map(p=>({x:p.time*1000, y:p.total})),
+    data: (timelines[i].timeline||[]).map(p => ({x: p.time*1000, y: p.total})),
     borderColor: colors[i],
     backgroundColor: colors[i]+'22',
     borderWidth: 2,
@@ -662,13 +688,13 @@ async function loadFeed() {
     return;
   }
   document.getElementById('stat-solves').textContent = data.events.length;
-  feed.innerHTML = data.events.map(e=>`
+  feed.innerHTML = data.events.map(e => `
     <div class="feed-item">
       <span class="feed-time">[${e.timestamp}]</span>
       <span class="feed-team">${e.team}</span>
       <span style="color:#4a8a6a">solved</span>
       <span>${e.challenge}</span>
-      ${e.first_blood?'<span style="color:var(--red)">🩸 FIRST BLOOD</span>':''}
+      ${e.first_blood ? '<span style="color:var(--red)">🩸 FIRST BLOOD</span>' : ''}
       <span class="feed-pts">+${e.points}</span>
     </div>`).join('');
 }
@@ -676,19 +702,19 @@ async function loadFeed() {
 async function openModal(ch) {
   currentChallenge = ch;
   document.getElementById('modal-title').textContent = ch.name;
-  document.getElementById('modal-desc').textContent = ch.description||'Find the flag!';
+  document.getElementById('modal-desc').textContent = ch.description || 'Find the flag!';
   document.getElementById('flag-input').value = '';
   document.getElementById('result-msg').style.display = 'none';
   await loadHints(ch);
   document.getElementById('modal').classList.add('active');
-  setTimeout(()=>document.getElementById('flag-input').focus(),100);
+  setTimeout(() => document.getElementById('flag-input').focus(), 100);
 }
 
 async function loadHints(ch) {
   const section = document.getElementById('hints-section');
   if (!ch.hints?.length) { section.innerHTML = ''; return; }
   const unlocked = token ? await api(`/hints/${ch.id}`) : {unlocked:[]};
-  const unlockedSet = new Set((unlocked.unlocked||[]).map(h=>h.hint_index));
+  const unlockedSet = new Set((unlocked.unlocked||[]).map(h => h.hint_index));
   section.innerHTML = `<div class="hints-title">💡 HINTS (${ch.hints.length} available)</div>` +
     ch.hints.map((hint, i) => {
       const cost = Math.floor(ch.points * 0.1 * (i + 1));
@@ -711,7 +737,7 @@ async function loadHints(ch) {
 }
 
 async function unlockHint(challengeId, hintIndex, cost) {
-  if (!token) return window.location.href='/login';
+  if (!token) return window.location.href = '/login';
   if (!confirm(`Unlock hint for -${cost} points?`)) return;
   const r = await api('/hints/unlock', {
     method: 'POST',
@@ -720,7 +746,7 @@ async function unlockHint(challengeId, hintIndex, cost) {
   if (r.success) {
     await loadHints(currentChallenge);
   } else {
-    alert(r.message||'Failed to unlock hint');
+    alert(r.message || 'Failed to unlock hint');
   }
 }
 
@@ -734,16 +760,16 @@ async function submitFlag() {
   const flag = document.getElementById('flag-input').value.trim();
   if (!flag) return;
   const r = await fetch('/api/v1/submit', {
-    method:'POST',
-    headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},
-    body: JSON.stringify({challenge_id:currentChallenge.id, flag, team})
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
+    body: JSON.stringify({challenge_id: currentChallenge.id, flag, team})
   });
   const data = await r.json();
   const msg = document.getElementById('result-msg');
   msg.style.display = 'block';
-  msg.className = 'result-msg '+(data.correct?'correct':'wrong');
+  msg.className = 'result-msg ' + (data.correct ? 'correct' : 'wrong');
   msg.textContent = data.message;
-  if (data.correct) setTimeout(()=>{closeModal();loadChallenges();loadScoreboard();loadFeed();},1800);
+  if (data.correct) setTimeout(() => { closeModal(); loadChallenges(); loadScoreboard(); loadFeed(); }, 1800);
 }
 
 function getCertificate(teamName, rank) {
@@ -751,26 +777,26 @@ function getCertificate(teamName, rank) {
 }
 
 function switchTab(name) {
-  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
   document.getElementById('panel-'+name).classList.add('active');
-  if (name==='scoreboard') loadScoreboard();
-  if (name==='feed') loadFeed();
+  if (name === 'scoreboard') loadScoreboard();
+  if (name === 'feed') loadFeed();
 }
 
 function logout() {
-  fetch('/api/v1/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}});
+  fetch('/api/v1/auth/logout', {method:'POST', headers:{'Authorization':`Bearer ${token}`}});
   localStorage.clear();
-  window.location.href='/login';
+  window.location.href = '/login';
 }
 
-document.getElementById('flag-input')?.addEventListener('keydown',e=>{if(e.key==='Enter')submitFlag();});
-document.getElementById('modal')?.addEventListener('click',e=>{if(e.target===document.getElementById('modal'))closeModal();});
+document.getElementById('flag-input')?.addEventListener('keydown', e => { if (e.key==='Enter') submitFlag(); });
+document.getElementById('modal')?.addEventListener('click', e => { if (e.target===document.getElementById('modal')) closeModal(); });
 
 loadChallenges();
 loadFeed();
-setInterval(()=>{loadScoreboard();loadFeed();},30000);
+setInterval(() => { loadScoreboard(); loadFeed(); }, 30000);
 </script>
 <script>""" + TIMER_JS + """</script>
 </body>
@@ -909,13 +935,13 @@ def create_app(config: Config = None) -> Flask:
         info = auth.get_team_info(team_name)
         score = info.get("score", 0) if info else 0
         solves = info.get("solves", 0) if info else 0
-        rank_emojis = {1:"🥇",2:"🥈",3:"🥉"}
+        rank_emojis = {1:"🥇", 2:"🥈", 3:"🥉"}
         cert_id = hashlib.md5(
             f"{team_name}{rank}{config.ctf_name}".encode()
         ).hexdigest()[:12].upper()
         return render_template_string(CERT_HTML,
             ctf_name=config.ctf_name, team=team_name,
-            rank=rank, rank_emoji=rank_emojis.get(rank,"🏅"),
+            rank=rank, rank_emoji=rank_emojis.get(rank, "🏅"),
             score=score, solves=solves,
             date=datetime.now().strftime("%B %d, %Y"),
             cert_id=cert_id)
@@ -926,10 +952,10 @@ def create_app(config: Config = None) -> Flask:
     def api_register():
         d = request.get_json()
         result = auth.register(
-            d.get("team_name","").strip(),
-            d.get("email","").strip().lower(),
-            d.get("password",""),
-            d.get("country","").strip()
+            d.get("team_name", "").strip(),
+            d.get("email", "").strip().lower(),
+            d.get("password", ""),
+            d.get("country", "").strip()
         )
         return jsonify({"success": result.success, "message": result.message})
 
@@ -938,18 +964,22 @@ def create_app(config: Config = None) -> Flask:
     def api_login():
         d = request.get_json()
         result = auth.login(
-            d.get("team_name","").strip(),
-            d.get("password",""),
+            d.get("team_name", "").strip(),
+            d.get("password", ""),
             request.remote_addr
         )
         is_admin = auth.is_admin(result.team) if result.success else False
-        return jsonify({"success": result.success, "message": result.message,
-                        "token": result.token, "team": result.team,
-                        "is_admin": is_admin})
+        return jsonify({
+            "success": result.success,
+            "message": result.message,
+            "token": result.token,
+            "team": result.team,
+            "is_admin": is_admin
+        })
 
     @app.route("/api/v1/auth/logout", methods=["POST"])
     def api_logout():
-        token = request.headers.get("Authorization","").replace("Bearer ","")
+        token = request.headers.get("Authorization", "").replace("Bearer ", "")
         auth.logout(token)
         return jsonify({"success": True})
 
@@ -957,7 +987,7 @@ def create_app(config: Config = None) -> Flask:
     @require_json
     def api_resend():
         d = request.get_json()
-        result = auth.resend_verification(d.get("email","").strip().lower())
+        result = auth.resend_verification(d.get("email", "").strip().lower())
         return jsonify({"success": result.success, "message": result.message})
 
     # ── Challenges API ─────────────────────────────────────────────────
@@ -981,8 +1011,8 @@ def create_app(config: Config = None) -> Flask:
     def api_submit():
         team = get_current_team()
         d = request.get_json()
-        challenge_id = d.get("challenge_id","").strip()
-        flag = d.get("flag","").strip()
+        challenge_id = d.get("challenge_id", "").strip()
+        flag = d.get("flag", "").strip()
         if not challenge_id or not flag:
             return jsonify({"error": "Missing fields"}), 400
         result = validator.validate(challenge_id, flag, team, request.remote_addr)
@@ -1018,7 +1048,7 @@ def create_app(config: Config = None) -> Flask:
     def api_unlock_hint():
         team = get_current_team()
         d = request.get_json()
-        challenge_id = d.get("challenge_id","")
+        challenge_id = d.get("challenge_id", "")
         hint_index = int(d.get("hint_index", 0))
         challenge = manager.get_challenge(challenge_id)
         if not challenge:
@@ -1057,7 +1087,7 @@ def create_app(config: Config = None) -> Flask:
 
     @app.route("/api/v1/scoreboard/timeline")
     def api_timeline():
-        team = request.args.get("team","")
+        team = request.args.get("team", "")
         return jsonify({"timeline": scoreboard.get_score_timeline(team)})
 
     @app.route("/api/v1/feed")
@@ -1096,28 +1126,28 @@ def create_app(config: Config = None) -> Flask:
     @require_admin
     @require_json
     def api_ban():
-        auth.ban_team(request.get_json().get("team_name",""))
+        auth.ban_team(request.get_json().get("team_name", ""))
         return jsonify({"success": True})
 
     @app.route("/api/v1/admin/teams/unban", methods=["POST"])
     @require_admin
     @require_json
     def api_unban():
-        auth.unban_team(request.get_json().get("team_name",""))
+        auth.unban_team(request.get_json().get("team_name", ""))
         return jsonify({"success": True})
 
     @app.route("/api/v1/admin/teams/delete", methods=["POST"])
     @require_admin
     @require_json
     def api_delete():
-        auth.delete_team(request.get_json().get("team_name",""))
+        auth.delete_team(request.get_json().get("team_name", ""))
         return jsonify({"success": True})
 
     @app.route("/api/v1/admin/teams/reset", methods=["POST"])
     @require_admin
     @require_json
     def api_reset():
-        auth.reset_team_score(request.get_json().get("team_name",""))
+        auth.reset_team_score(request.get_json().get("team_name", ""))
         return jsonify({"success": True})
 
     @app.errorhandler(404)
