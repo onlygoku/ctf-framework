@@ -998,58 +998,68 @@ def create_app(config: Config = None) -> Flask:
     @app.route("/debug-schema")
     def debug_schema():
         try:
-            rows = auth.db.fetchall("""
-                SELECT column_name, data_type
-                FROM information_schema.columns
-                WHERE table_name = 'teams'
-                ORDER BY ordinal_position
-            """)
-            output = "TEAMS TABLE COLUMNS:\n"
-            output += "\n".join([f"  {r[0]} — {r[1]}" for r in rows])
-
-            rows2 = auth.db.fetchall("""
-                SELECT column_name, data_type
-                FROM information_schema.columns
-                WHERE table_name = 'login_attempts'
-                ORDER BY ordinal_position
-            """)
-            output += "\n\nLOGIN_ATTEMPTS TABLE COLUMNS:\n"
-            output += "\n".join([f"  {r[0]} — {r[1]}" for r in rows2])
-
-            rows3 = auth.db.fetchall("""
-                SELECT table_name FROM information_schema.tables
-                WHERE table_schema = 'public'
-                ORDER BY table_name
-            """)
-            output += "\n\nALL TABLES:\n"
-            output += "\n".join([f"  {r[0]}" for r in rows3])
-
+            all_tables = ['teams', 'sessions', 'login_attempts', 'solves', 'hint_unlocks', 'submissions', 'challenges']
+            output = ""
+            for table in all_tables:
+                cols = auth.db.fetchall(f"""
+                    SELECT column_name, data_type FROM information_schema.columns
+                    WHERE table_name = '{table}' ORDER BY ordinal_position
+                """)
+                output += f"{table.upper()}:\n"
+                output += "\n".join([f"  {r[0]} — {r[1]}" for r in cols]) or "  (no columns found)"
+                output += "\n\n"
             return f"<pre style='background:#111;color:#0f0;padding:2rem;font-family:monospace'>{output}</pre>"
         except Exception as e:
             return f"<pre style='color:red'>Error: {e}\n{traceback.format_exc()}</pre>", 500
 
-    @app.route("/fix-schema-now")
-    def fix_schema():
+    @app.route("/fix-all-now")
+    def fix_all():
         try:
             results = []
-            fixes = [
+
+            # Show all current columns
+            all_tables = ['teams', 'sessions', 'login_attempts', 'solves', 'hint_unlocks', 'submissions', 'challenges']
+            for table in all_tables:
+                cols = auth.db.fetchall(f"""
+                    SELECT column_name FROM information_schema.columns
+                    WHERE table_name = '{table}' ORDER BY ordinal_position
+                """)
+                results.append(f"{table.upper()}: " + ", ".join([c[0] for c in cols]))
+
+            results.append("\n--- FIXING TEAMS ---")
+            for sql in [
                 "ALTER TABLE teams ADD COLUMN IF NOT EXISTS email TEXT DEFAULT ''",
                 "ALTER TABLE teams ADD COLUMN IF NOT EXISTS password_hash TEXT DEFAULT ''",
                 "ALTER TABLE teams ADD COLUMN IF NOT EXISTS verified INTEGER DEFAULT 0",
                 "ALTER TABLE teams ADD COLUMN IF NOT EXISTS banned INTEGER DEFAULT 0",
-            ]
-            for sql in fixes:
+            ]:
                 try:
                     auth.db.execute(sql)
                     results.append(f"OK: {sql}")
                 except Exception as e:
-                    results.append(f"SKIP: {sql} — {e}")
+                    results.append(f"SKIP: {e}")
 
-            cols = auth.db.fetchall("""
-                SELECT column_name FROM information_schema.columns
-                WHERE table_name = 'teams' ORDER BY ordinal_position
-            """)
-            results.append("\nFINAL COLUMNS: " + ", ".join([c[0] for c in cols]))
+            results.append("\n--- FIXING SESSIONS ---")
+            for sql in [
+                "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS team TEXT DEFAULT ''",
+                "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS token TEXT DEFAULT ''",
+                "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS expires_at REAL DEFAULT 0",
+                "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS created_at REAL DEFAULT 0",
+            ]:
+                try:
+                    auth.db.execute(sql)
+                    results.append(f"OK: {sql}")
+                except Exception as e:
+                    results.append(f"SKIP: {e}")
+
+            results.append("\n--- FINAL COLUMNS ---")
+            for table in ['teams', 'sessions']:
+                cols = auth.db.fetchall(f"""
+                    SELECT column_name FROM information_schema.columns
+                    WHERE table_name = '{table}' ORDER BY ordinal_position
+                """)
+                results.append(f"{table.upper()}: " + ", ".join([c[0] for c in cols]))
+
             return f"<pre style='background:#111;color:#0f0;padding:2rem'>" + "\n".join(results) + "</pre>"
         except Exception as e:
             return f"<pre style='color:red'>Error: {e}\n{traceback.format_exc()}</pre>", 500
@@ -1067,17 +1077,11 @@ def create_app(config: Config = None) -> Flask:
             col_names = [c[0] for c in cols]
             auth.db.execute("DELETE FROM teams WHERE name=?", (admin_name,))
             pw_hash = bcrypt.hashpw(admin_pass.encode(), bcrypt.gensalt()).decode()
-            if 'email' in col_names:
-                auth.db.execute(
-                    "INSERT INTO teams (name, email, password_hash, country, verified, banned) VALUES (?,?,?,?,1,0)",
-                    (admin_name, f"{admin_name}@ctf.local", pw_hash, "")
-                )
-            else:
-                auth.db.execute(
-                    "INSERT INTO teams (name, password_hash, country, verified, banned) VALUES (?,?,?,1,0)",
-                    (admin_name, pw_hash, "")
-                )
-            return f"<pre style='background:#111;color:#0f0;padding:2rem'>Admin '{admin_name}' recreated!\nPassword: {admin_pass}\nColumns found: {col_names}\n\nNOW DELETE THESE DEBUG ROUTES AND REDEPLOY!</pre>"
+            auth.db.execute(
+                "INSERT INTO teams (name, email, password_hash, country, verified, banned) VALUES (?,?,?,?,1,0)",
+                (admin_name, f"{admin_name}@ctf.local", pw_hash, "")
+            )
+            return f"<pre style='background:#111;color:#0f0;padding:2rem'>Admin '{admin_name}' recreated!\nPassword: {admin_pass}\nColumns: {col_names}\n\nNOW DELETE THESE DEBUG ROUTES AND REDEPLOY!</pre>"
         except Exception as e:
             return f"<pre style='color:red'>Error: {e}\n{traceback.format_exc()}</pre>", 500
 
