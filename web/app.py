@@ -1,5 +1,5 @@
 """
-Web App - CTF Platform - Dragon Ball Z Theme with Autonomous Characters
+Web App - CTF Platform - Dragon Ball Z Theme with Real Character Images
 """
 
 import sys
@@ -18,367 +18,401 @@ from ctf_core.flag_validator import FlagValidator
 from ctf_core.scoreboard import Scoreboard
 from ctf_core.auth import AuthManager
 
-# ── CHARACTER SVG SPRITES ─────────────────────────────────────────────
-GOKU_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 100" width="60" height="100">
-  <!-- Goku - Orange gi, black hair, Super Saiyan aura -->
-  <!-- Aura -->
-  <ellipse cx="30" cy="85" rx="22" ry="8" fill="#ffd700" opacity="0.3" class="aura-base"/>
-  <!-- Legs -->
-  <rect x="18" y="65" width="10" height="25" rx="3" fill="#ff6a00"/>
-  <rect x="32" y="65" width="10" height="25" rx="3" fill="#ff6a00"/>
-  <!-- Boots -->
-  <rect x="16" y="82" width="13" height="8" rx="2" fill="#1a1a2e"/>
-  <rect x="31" y="82" width="13" height="8" rx="2" fill="#1a1a2e"/>
-  <!-- Body -->
-  <rect x="15" y="38" width="30" height="30" rx="4" fill="#ff6a00"/>
-  <!-- Belt -->
-  <rect x="15" y="60" width="30" height="5" rx="1" fill="#1a1a2e"/>
-  <rect x="27" y="58" width="6" height="9" rx="1" fill="#ffd700"/>
-  <!-- Arms -->
-  <rect x="4" y="40" width="11" height="8" rx="3" fill="#ffcc99"/>
-  <rect x="45" y="40" width="11" height="8" rx="3" fill="#ffcc99"/>
-  <!-- Hands -->
-  <circle cx="8" cy="52" r="5" fill="#ffcc99"/>
-  <circle cx="52" cy="52" r="5" fill="#ffcc99"/>
-  <!-- Neck -->
-  <rect x="25" y="30" width="10" height="10" rx="2" fill="#ffcc99"/>
-  <!-- Head -->
-  <ellipse cx="30" cy="22" rx="14" ry="15" fill="#ffcc99"/>
-  <!-- Eyes -->
-  <ellipse cx="24" cy="20" rx="3" ry="3.5" fill="white"/>
-  <ellipse cx="36" cy="20" rx="3" ry="3.5" fill="white"/>
-  <circle cx="25" cy="21" r="2" fill="#1a1a2e"/>
-  <circle cx="37" cy="21" r="2" fill="#1a1a2e"/>
-  <circle cx="25.5" cy="20.5" r=".7" fill="white"/>
-  <circle cx="37.5" cy="20.5" r=".7" fill="white"/>
-  <!-- Eyebrows -->
-  <path d="M21 16 Q24 14 27 16" stroke="#1a1a2e" stroke-width="1.5" fill="none" stroke-linecap="round"/>
-  <path d="M33 16 Q36 14 39 16" stroke="#1a1a2e" stroke-width="1.5" fill="none" stroke-linecap="round"/>
-  <!-- Nose -->
-  <ellipse cx="30" cy="24" rx="2" ry="1.5" fill="#e8a87c"/>
-  <!-- Mouth smile -->
-  <path d="M25 29 Q30 33 35 29" stroke="#c97b4b" stroke-width="1.5" fill="none" stroke-linecap="round"/>
-  <!-- Scar on cheek -->
-  <path d="M37 23 L39 26" stroke="#c97b4b" stroke-width="1" fill="none"/>
-  <!-- Hair - Goku spiky black -->
-  <polygon points="30,7 22,18 18,10 16,20 12,12 14,22 20,8" fill="#1a1a2e"/>
-  <polygon points="30,5 38,16 42,8 44,18 48,10 44,22 38,6" fill="#1a1a2e"/>
-  <polygon points="22,8 30,2 38,8 34,4 30,7 26,4" fill="#1a1a2e"/>
-  <!-- Gi collar -->
-  <path d="M20 38 L30 44 L40 38" stroke="#1a1a2e" stroke-width="2" fill="none"/>
-  <!-- Tail -->
-  <path d="M45 60 Q55 55 58 48 Q60 42 56 40" stroke="#c97b4b" stroke-width="3" fill="none" stroke-linecap="round"/>
-</svg>"""
+CHARACTER_JS = """
+(function() {
+  const CHARS = [
+    {
+      id: 'goku', name: 'Goku',
+      img: 'https://www.pngmart.com/files/22/Goku-PNG-Isolated-File.png',
+      imgSSJ: 'https://www.pngmart.com/files/22/Goku-SSJ-PNG-Isolated-Photo.png',
+      width: 160, auraColor: '#ffd700', glowColor: '#ff6a00',
+      quotes: ['KAMEHAMEHA!!','I need to get stronger!','KAIO-KEN x10!','Time to power up!','This is not over yet!'],
+      fightQuotes: ['KAMEHAMEHA!!','KAIO-KEN!!','This ends NOW!'],
+      powerUpQuotes: ["I'M GOING SUPER SAIYAN!",'AAAAHHHHH!!!','FULL POWER!!'],
+      speed: 1.4, jumpHeight: 200, isSSJ: false,
+      x: 80, y: 0, vx: 1.4, state: 'walk', stateTimer: 100,
+      jumpVy: 0, isJumping: false, flipped: false,
+    },
+    {
+      id: 'vegeta', name: 'Vegeta',
+      img: 'https://www.pngmart.com/files/22/Vegeta-PNG-Isolated-Cutout.png',
+      imgSSJ: null,
+      width: 150, auraColor: '#8800ff', glowColor: '#aa00ff',
+      quotes: ['I am the PRINCE of Saiyans!','My power is MAXIMUM!','OVER 9000!!','FINAL FLASH!!','You pathetic weakling!'],
+      fightQuotes: ['FINAL FLASH!!','GALICK GUN!!','I will destroy you!'],
+      powerUpQuotes: ['MY PRIDE...!','VEGETA DOES NOT LOSE!','FINAL BURST!!'],
+      speed: 1.6, jumpHeight: 180, isSSJ: false,
+      x: 500, y: 0, vx: -1.6, state: 'walk', stateTimer: 120,
+      jumpVy: 0, isJumping: false, flipped: true,
+    },
+    {
+      id: 'piccolo', name: 'Piccolo',
+      img: 'https://www.pngmart.com/files/22/Piccolo-PNG-Free-Download.png',
+      imgSSJ: null,
+      width: 155, auraColor: '#00aa44', glowColor: '#004422',
+      quotes: ['Special Beam Cannon!','I sense a great power...','Training never ends.','MAKANKOSAPPO!!','Hmph.'],
+      fightQuotes: ['SPECIAL BEAM CANNON!!','HELLZONE GRENADE!!','You are no match for me!'],
+      powerUpQuotes: ['My power grows...','UNLIMITED POWER!!','Feel my ki!!'],
+      speed: 1.2, jumpHeight: 220, isSSJ: false,
+      x: 900, y: 0, vx: 1.2, state: 'idle', stateTimer: 200,
+      jumpVy: 0, isJumping: false, flipped: false,
+    },
+    {
+      id: 'frieza', name: 'Frieza',
+      img: 'https://www.pngmart.com/files/22/Frieza-PNG-File.png',
+      imgSSJ: null,
+      width: 145, auraColor: '#cc44ff', glowColor: '#880088',
+      quotes: ["I am the greatest in the universe!",'Pathetic creatures...','DEATH BEAM!!','No one can stop me!','Kneel before me!'],
+      fightQuotes: ['DEATH BALL!!','SUPERNOVA!!','You will all perish!'],
+      powerUpQuotes: ['100% POWER!!','UNLIMITED POWER!!','TREMBLE BEFORE ME!!'],
+      speed: 1.3, jumpHeight: 230, isSSJ: false,
+      x: 1100, y: 0, vx: -1.3, state: 'float', stateTimer: 180,
+      jumpVy: 0, isJumping: false, flipped: true,
+    },
+    {
+      id: 'gohan', name: 'Gohan',
+      img: 'https://www.pngmart.com/files/22/Gohan-PNG-Free-Download.png',
+      imgSSJ: null,
+      width: 148, auraColor: '#ffd700', glowColor: '#ff6600',
+      quotes: ["It's over!","I won't let you hurt them!",'MASENKO!!','SSJ2 UNLOCKED!!','THIS POWER...!'],
+      fightQuotes: ['MASENKO HA!!','FATHER-SON KAMEHAMEHA!!','THIS ENDS NOW!!'],
+      powerUpQuotes: ['RAAAHHHHH!!!','SSJ2!!!','UNLIMITED POWER!!!'],
+      speed: 1.5, jumpHeight: 195, isSSJ: false,
+      x: 300, y: 0, vx: -1.5, state: 'walk', stateTimer: 110,
+      jumpVy: 0, isJumping: false, flipped: true,
+    },
+  ];
 
-GOKU_SSJ_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 100" width="60" height="100">
-  <!-- Goku Super Saiyan - Golden hair, intense aura -->
-  <!-- Golden aura flames -->
-  <ellipse cx="30" cy="90" rx="28" ry="10" fill="#ffd700" opacity="0.4"/>
-  <path d="M10 70 Q5 50 15 30 Q20 15 30 10 Q40 15 45 30 Q55 50 50 70" fill="#ffd700" opacity="0.2"/>
-  <path d="M15 65 Q8 45 18 25 Q24 12 30 8 Q36 12 42 25 Q52 45 45 65" fill="#ffaa00" opacity="0.15"/>
-  <!-- Aura spikes -->
-  <polygon points="30,5 25,25 30,20 35,25" fill="#ffd700" opacity="0.6"/>
-  <polygon points="15,15 18,35 22,28 20,38" fill="#ffd700" opacity="0.5"/>
-  <polygon points="45,15 42,35 38,28 40,38" fill="#ffd700" opacity="0.5"/>
-  <polygon points="8,35 14,50 18,44 15,55" fill="#ffaa00" opacity="0.4"/>
-  <polygon points="52,35 46,50 42,44 45,55" fill="#ffaa00" opacity="0.4"/>
-  <!-- Legs -->
-  <rect x="18" y="65" width="10" height="25" rx="3" fill="#ff6a00"/>
-  <rect x="32" y="65" width="10" height="25" rx="3" fill="#ff6a00"/>
-  <rect x="16" y="82" width="13" height="8" rx="2" fill="#1a1a2e"/>
-  <rect x="31" y="82" width="13" height="8" rx="2" fill="#1a1a2e"/>
-  <!-- Body -->
-  <rect x="15" y="38" width="30" height="30" rx="4" fill="#ff6a00"/>
-  <rect x="15" y="60" width="30" height="5" rx="1" fill="#1a1a2e"/>
-  <rect x="27" y="58" width="6" height="9" rx="1" fill="#ffd700"/>
-  <!-- Arms powered up -->
-  <rect x="3" y="38" width="12" height="9" rx="3" fill="#ffcc99"/>
-  <rect x="45" y="38" width="12" height="9" rx="3" fill="#ffcc99"/>
-  <circle cx="7" cy="52" r="6" fill="#ffcc99"/>
-  <circle cx="53" cy="52" r="6" fill="#ffcc99"/>
-  <!-- Energy in hands -->
-  <circle cx="7" cy="52" r="4" fill="#ffd700" opacity="0.6"/>
-  <circle cx="53" cy="52" r="4" fill="#ffd700" opacity="0.6"/>
-  <!-- Neck -->
-  <rect x="25" y="30" width="10" height="10" rx="2" fill="#ffcc99"/>
-  <!-- Head -->
-  <ellipse cx="30" cy="22" rx="14" ry="15" fill="#ffcc99"/>
-  <!-- Eyes - intense teal SSJ eyes -->
-  <ellipse cx="24" cy="20" rx="3.5" ry="4" fill="#00ffcc"/>
-  <ellipse cx="36" cy="20" rx="3.5" ry="4" fill="#00ffcc"/>
-  <circle cx="25" cy="21" r="2" fill="#004433"/>
-  <circle cx="37" cy="21" r="2" fill="#004433"/>
-  <!-- Eyebrows - angry -->
-  <path d="M20 15 L27 17" stroke="#1a1a2e" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-  <path d="M33 17 L40 15" stroke="#1a1a2e" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-  <!-- Nose/Mouth -->
-  <ellipse cx="30" cy="24" rx="2" ry="1.5" fill="#e8a87c"/>
-  <path d="M26 29 Q30 27 34 29" stroke="#c97b4b" stroke-width="1.5" fill="none"/>
-  <!-- GOLDEN HAIR -->
-  <polygon points="30,5 20,16 16,8 14,18 10,10 12,20 18,6" fill="#ffd700"/>
-  <polygon points="30,3 40,14 44,6 46,16 50,8 46,20 40,4" fill="#ffd700"/>
-  <polygon points="20,6 30,0 40,6 36,2 30,5 24,2" fill="#ffd700"/>
-  <polygon points="16,18 12,30 16,26 14,32" fill="#ffd700"/>
-  <polygon points="44,18 48,30 44,26 46,32" fill="#ffd700"/>
-  <!-- Hair glow -->
-  <polygon points="30,5 20,16 16,8 14,18 10,10 12,20 18,6" fill="#fff" opacity="0.3"/>
-  <!-- Gi collar -->
-  <path d="M20 38 L30 44 L40 38" stroke="#1a1a2e" stroke-width="2" fill="none"/>
-</svg>"""
+  const FALLBACK_IMGS = {
+    goku:    'https://static.wikia.nocookie.net/dragonball/images/5/5b/Goku_SSJ_Namek_Saga.png',
+    vegeta:  'https://static.wikia.nocookie.net/dragonball/images/8/8b/VegetavsGokuEp.png',
+    piccolo: 'https://static.wikia.nocookie.net/dragonball/images/3/33/PiccoloNV.png',
+    frieza:  'https://static.wikia.nocookie.net/dragonball/images/6/6c/FriezaFinalForm.png',
+    gohan:   'https://static.wikia.nocookie.net/dragonball/images/5/5b/GohanSSJ2Cell.png',
+  };
 
-VEGETA_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 100" width="60" height="100">
-  <!-- Vegeta - Blue/white armor, widow's peak, proud posture -->
-  <!-- Aura -->
-  <ellipse cx="30" cy="88" rx="20" ry="7" fill="#8800ff" opacity="0.3"/>
-  <!-- Legs -->
-  <rect x="18" y="65" width="10" height="25" rx="3" fill="#ffffff"/>
-  <rect x="32" y="65" width="10" height="25" rx="3" fill="#ffffff"/>
-  <rect x="16" y="82" width="13" height="8" rx="2" fill="#1a1a2e"/>
-  <rect x="31" y="82" width="13" height="8" rx="2" fill="#1a1a2e"/>
-  <!-- Body armor - white with blue -->
-  <rect x="14" y="36" width="32" height="32" rx="4" fill="#ffffff"/>
-  <!-- Armor chest plates -->
-  <rect x="14" y="36" width="32" height="32" rx="4" fill="#0044cc" opacity="0.15"/>
-  <ellipse cx="30" cy="52" rx="12" ry="10" fill="#ffffff"/>
-  <ellipse cx="30" cy="52" rx="10" ry="8" fill="#e8e8ff"/>
-  <!-- Armor shoulder pads -->
-  <rect x="4" y="34" width="14" height="8" rx="4" fill="#ffffff"/>
-  <rect x="42" y="34" width="14" height="8" rx="4" fill="#ffffff"/>
-  <!-- Arms -->
-  <rect x="5" y="42" width="10" height="8" rx="3" fill="#ffcc99"/>
-  <rect x="45" y="42" width="10" height="8" rx="3" fill="#ffcc99"/>
-  <!-- Gloves -->
-  <circle cx="8" cy="54" r="5" fill="#ffffff"/>
-  <circle cx="52" cy="54" r="5" fill="#ffffff"/>
-  <!-- Neck -->
-  <rect x="25" y="28" width="10" height="10" rx="2" fill="#ffcc99"/>
-  <!-- Head -->
-  <ellipse cx="30" cy="20" rx="13" ry="14" fill="#ffcc99"/>
-  <!-- Eyes - sharp, intense -->
-  <ellipse cx="24" cy="18" rx="3" ry="3.5" fill="white"/>
-  <ellipse cx="36" cy="18" rx="3" ry="3.5" fill="white"/>
-  <circle cx="25" cy="19" r="2.2" fill="#1a1a2e"/>
-  <circle cx="37" cy="19" r="2.2" fill="#1a1a2e"/>
-  <circle cx="25.5" cy="18.5" r=".7" fill="white"/>
-  <circle cx="37.5" cy="18.5" r=".7" fill="white"/>
-  <!-- Vegeta signature scowl eyebrows -->
-  <path d="M20 13 L27 15" stroke="#1a1a2e" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-  <path d="M33 15 L40 13" stroke="#1a1a2e" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-  <!-- Nose -->
-  <ellipse cx="30" cy="22" rx="2" ry="1.5" fill="#e8a87c"/>
-  <!-- Frown -->
-  <path d="M25 27 Q30 25 35 27" stroke="#c97b4b" stroke-width="1.5" fill="none" stroke-linecap="round"/>
-  <!-- Vegeta iconic widow's peak black hair -->
-  <polygon points="30,4 22,14 18,6 16,16 12,8 16,18 22,5" fill="#1a1a2e"/>
-  <polygon points="30,4 38,14 42,6 44,16 48,8 44,18 38,5" fill="#1a1a2e"/>
-  <polygon points="22,5 30,0 38,5 34,2 30,4 26,2" fill="#1a1a2e"/>
-  <!-- Widow's peak point -->
-  <polygon points="27,13 30,8 33,13 30,18" fill="#1a1a2e"/>
-  <!-- Scouter -->
-  <ellipse cx="23" cy="17" rx="5" ry="4" fill="#00ff44" opacity="0.6" stroke="#00ff44" stroke-width="1"/>
-  <ellipse cx="23" cy="17" rx="3" ry="2.5" fill="#00ff44" opacity="0.8"/>
-  <rect x="18" y="16" width="5" height="2" rx="1" fill="#1a1a2e" opacity="0.5"/>
-  <!-- Armor trim -->
-  <rect x="14" y="62" width="32" height="4" rx="1" fill="#0044cc" opacity="0.4"/>
-</svg>"""
+  const GRAVITY = 0.75;
+  let frameCount = 0;
+  let elements = {};
 
-PICCOLO_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 100" width="60" height="100">
-  <!-- Piccolo - Green skin, white turban/cape, antenna, pointy ears -->
-  <!-- Purple aura -->
-  <ellipse cx="30" cy="88" rx="20" ry="7" fill="#4400aa" opacity="0.35"/>
-  <!-- White cape/weighted cloak -->
-  <path d="M8 40 L12 90 L30 88 L48 90 L52 40 L44 36 L30 38 L16 36 Z" fill="#e8e8e8" opacity="0.9"/>
-  <!-- Purple gi underneath -->
-  <rect x="17" y="38" width="26" height="30" rx="3" fill="#4400aa"/>
-  <!-- Legs -->
-  <rect x="19" y="66" width="9" height="24" rx="3" fill="#4400aa"/>
-  <rect x="32" y="66" width="9" height="24" rx="3" fill="#4400aa"/>
-  <rect x="17" y="82" width="12" height="8" rx="2" fill="#1a0044"/>
-  <rect x="31" y="82" width="12" height="8" rx="2" fill="#1a0044"/>
-  <!-- Arms (green) -->
-  <rect x="5" y="40" width="12" height="8" rx="3" fill="#228833"/>
-  <rect x="43" y="40" width="12" height="8" rx="3" fill="#228833"/>
-  <circle cx="9" cy="53" r="5" fill="#228833"/>
-  <circle cx="51" cy="53" r="5" fill="#228833"/>
-  <!-- Neck (green) -->
-  <rect x="25" y="28" width="10" height="12" rx="2" fill="#228833"/>
-  <!-- Head (green) -->
-  <ellipse cx="30" cy="20" rx="14" ry="15" fill="#228833"/>
-  <!-- White turban -->
-  <ellipse cx="30" cy="10" rx="14" ry="7" fill="#e8e8e8"/>
-  <rect x="16" y="8" width="28" height="6" rx="3" fill="#e8e8e8"/>
-  <!-- Antenna -->
-  <line x1="30" y1="3" x2="30" y2="14" stroke="#228833" stroke-width="2"/>
-  <circle cx="30" cy="2" r="2" fill="#228833"/>
-  <!-- Pointy ears -->
-  <polygon points="16,18 10,12 14,22" fill="#228833"/>
-  <polygon points="44,18 50,12 46,22" fill="#228833"/>
-  <!-- Eyes - white, no pupils (meditative) -->
-  <ellipse cx="24" cy="19" rx="3.5" ry="4" fill="white"/>
-  <ellipse cx="36" cy="19" rx="3.5" ry="4" fill="white"/>
-  <circle cx="25" cy="20" r="2.2" fill="#cc0000"/>
-  <circle cx="37" cy="20" r="2.2" fill="#cc0000"/>
-  <circle cx="25.5" cy="19.5" r=".7" fill="white"/>
-  <circle cx="37.5" cy="19.5" r=".7" fill="white"/>
-  <!-- Piccolo frown/serious brows -->
-  <path d="M20 14 L27 16" stroke="#1a4a1a" stroke-width="2" fill="none" stroke-linecap="round"/>
-  <path d="M33 16 L40 14" stroke="#1a4a1a" stroke-width="2" fill="none" stroke-linecap="round"/>
-  <!-- Nose (flat, Namekian) -->
-  <ellipse cx="30" cy="23" rx="1.5" ry="2" fill="#1a6622"/>
-  <!-- Mouth -->
-  <path d="M25 28 Q30 26 35 28" stroke="#1a6622" stroke-width="1.5" fill="none"/>
-  <!-- Cape collar -->
-  <path d="M16 36 Q30 42 44 36" stroke="#cccccc" stroke-width="2" fill="none"/>
-  <!-- Ki dots on forehead -->
-  <circle cx="30" cy="15" r="2" fill="#cc0000"/>
-</svg>"""
+  function init() {
+    const layer = document.getElementById('characters-layer');
+    if (!layer) return;
 
-FRIEZA_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 100" width="60" height="100">
-  <!-- Frieza Final Form - White/purple, floating, menacing -->
-  <!-- Dark aura -->
-  <ellipse cx="30" cy="90" rx="22" ry="8" fill="#660088" opacity="0.4"/>
-  <ellipse cx="30" cy="88" rx="16" ry="5" fill="#aa00cc" opacity="0.3"/>
-  <!-- Tail -->
-  <path d="M44 70 Q55 65 58 55 Q60 45 54 42" stroke="#cc88ff" stroke-width="4" fill="none" stroke-linecap="round"/>
-  <ellipse cx="54" cy="41" rx="4" ry="3" fill="#cc88ff"/>
-  <!-- Legs (hovering pose) -->
-  <rect x="19" y="66" width="9" height="20" rx="5" fill="#cc88ff"/>
-  <rect x="32" y="66" width="9" height="20" rx="5" fill="#cc88ff"/>
-  <!-- Feet pointed -->
-  <ellipse cx="23" cy="87" rx="6" ry="4" fill="#aa66dd"/>
-  <ellipse cx="37" cy="87" rx="6" ry="4" fill="#aa66dd"/>
-  <!-- Body - sleek white armor -->
-  <ellipse cx="30" cy="54" rx="16" ry="18" fill="#f0e8ff"/>
-  <!-- Purple chest gem/mark -->
-  <ellipse cx="30" cy="48" rx="8" ry="6" fill="#cc88ff"/>
-  <ellipse cx="30" cy="48" rx="6" ry="4" fill="#aa44cc"/>
-  <!-- Arms -->
-  <rect x="5" y="44" width="11" height="7" rx="4" fill="#f0e8ff"/>
-  <rect x="44" y="44" width="11" height="7" rx="4" fill="#f0e8ff"/>
-  <!-- Clawed hands -->
-  <circle cx="9" cy="55" r="5" fill="#f0e8ff"/>
-  <circle cx="51" cy="55" r="5" fill="#f0e8ff"/>
-  <!-- Claws -->
-  <line x1="6" y1="58" x2="4" y2="63" stroke="#cc88ff" stroke-width="2"/>
-  <line x1="9" y1="60" x2="8" y2="65" stroke="#cc88ff" stroke-width="2"/>
-  <line x1="12" y1="58" x2="14" y2="63" stroke="#cc88ff" stroke-width="2"/>
-  <line x1="48" y1="58" x2="46" y2="63" stroke="#cc88ff" stroke-width="2"/>
-  <line x1="51" y1="60" x2="50" y2="65" stroke="#cc88ff" stroke-width="2"/>
-  <line x1="54" y1="58" x2="56" y2="63" stroke="#cc88ff" stroke-width="2"/>
-  <!-- Neck -->
-  <rect x="25" y="28" width="10" height="10" rx="2" fill="#f0e8ff"/>
-  <!-- Head - smooth, dome like -->
-  <ellipse cx="30" cy="20" rx="14" ry="16" fill="#f0e8ff"/>
-  <!-- Purple head markings -->
-  <ellipse cx="30" cy="14" rx="8" ry="5" fill="#cc88ff"/>
-  <path d="M16 20 Q30 14 44 20" fill="#cc88ff" opacity="0.5"/>
-  <!-- Horns -->
-  <polygon points="20,10 16,2 23,8" fill="#cc88ff"/>
-  <polygon points="40,10 44,2 37,8" fill="#cc88ff"/>
-  <!-- Eyes - red, menacing -->
-  <ellipse cx="24" cy="20" rx="4" ry="4.5" fill="#cc0000"/>
-  <ellipse cx="36" cy="20" rx="4" ry="4.5" fill="#cc0000"/>
-  <circle cx="25" cy="21" r="2.5" fill="#660000"/>
-  <circle cx="37" cy="21" r="2.5" fill="#660000"/>
-  <circle cx="25.5" cy="20.5" r=".8" fill="#ff4444"/>
-  <circle cx="37.5" cy="20.5" r=".8" fill="#ff4444"/>
-  <!-- Evil smile -->
-  <path d="M23 28 Q30 32 37 28" stroke="#cc88ff" stroke-width="1.5" fill="none" stroke-linecap="round"/>
-  <!-- No nose (Frieza has none) -->
-  <ellipse cx="30" cy="25" rx="1.5" ry="1" fill="#e0d0f0"/>
-</svg>"""
+    CHARS.forEach(char => {
+      const wrap = document.createElement('div');
+      wrap.id = 'char-' + char.id;
+      wrap.style.cssText = `
+        position:absolute;bottom:0;left:${char.x}px;
+        width:${char.width}px;pointer-events:auto;
+        cursor:pointer;z-index:4;transition:filter 0.3s;
+      `;
 
-KRILLIN_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 85" width="50" height="85">
-  <!-- Krillin - Short, bald, 6 dots, orange gi -->
-  <ellipse cx="25" cy="75" rx="16" ry="5" fill="#ff6a00" opacity="0.25"/>
-  <!-- Legs -->
-  <rect x="14" y="56" width="8" height="20" rx="3" fill="#ff6a00"/>
-  <rect x="28" y="56" width="8" height="20" rx="3" fill="#ff6a00"/>
-  <rect x="12" y="68" width="11" height="7" rx="2" fill="#1a1a2e"/>
-  <rect x="27" y="68" width="11" height="7" rx="2" fill="#1a1a2e"/>
-  <!-- Body -->
-  <rect x="12" y="32" width="26" height="26" rx="4" fill="#ff6a00"/>
-  <rect x="12" y="52" width="26" height="4" rx="1" fill="#1a1a2e"/>
-  <rect x="22" y="50" width="6" height="7" rx="1" fill="#ffd700"/>
-  <!-- Arms -->
-  <rect x="3" y="34" width="9" height="7" rx="3" fill="#ffcc99"/>
-  <rect x="38" y="34" width="9" height="7" rx="3" fill="#ffcc99"/>
-  <circle cx="6" cy="45" r="4" fill="#ffcc99"/>
-  <circle cx="44" cy="45" r="4" fill="#ffcc99"/>
-  <!-- Neck -->
-  <rect x="21" y="25" width="8" height="8" rx="2" fill="#ffcc99"/>
-  <!-- Head (bald, round) -->
-  <ellipse cx="25" cy="17" rx="13" ry="14" fill="#ffcc99"/>
-  <!-- Eyes -->
-  <ellipse cx="20" cy="15" rx="3" ry="3.5" fill="white"/>
-  <ellipse cx="30" cy="15" rx="3" ry="3.5" fill="white"/>
-  <circle cx="21" cy="16" r="2" fill="#1a1a2e"/>
-  <circle cx="31" cy="16" r="2" fill="#1a1a2e"/>
-  <!-- Eyebrows -->
-  <path d="M17 11 Q20 9 23 11" stroke="#1a1a2e" stroke-width="1.5" fill="none"/>
-  <path d="M27 11 Q30 9 33 11" stroke="#1a1a2e" stroke-width="1.5" fill="none"/>
-  <!-- Nose/smile -->
-  <ellipse cx="25" cy="19" rx="1.5" ry="1" fill="#e8a87c"/>
-  <path d="M21 23 Q25 26 29 23" stroke="#c97b4b" stroke-width="1.5" fill="none"/>
-  <!-- 6 forehead dots -->
-  <circle cx="18" cy="8" r="1.5" fill="#c97b4b"/>
-  <circle cx="22" cy="6" r="1.5" fill="#c97b4b"/>
-  <circle cx="26" cy="5" r="1.5" fill="#c97b4b"/>
-  <circle cx="30" cy="6" r="1.5" fill="#c97b4b"/>
-  <circle cx="34" cy="8" r="1.5" fill="#c97b4b"/>
-  <circle cx="25" cy="10" r="1.5" fill="#c97b4b"/>
-  <!-- Gi collar -->
-  <path d="M16 32 L25 37 L34 32" stroke="#1a1a2e" stroke-width="1.5" fill="none"/>
-</svg>"""
+      const aura = document.createElement('div');
+      aura.id = 'aura-' + char.id;
+      aura.style.cssText = `
+        position:absolute;bottom:-10px;left:50%;
+        transform:translateX(-50%);
+        width:80%;height:30px;
+        background:${char.auraColor};
+        border-radius:50%;
+        filter:blur(14px);
+        opacity:0.55;
+        animation:auraPulse 1.8s ease-in-out infinite alternate;
+        pointer-events:none;z-index:1;
+      `;
+      wrap.appendChild(aura);
 
-GOHAN_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 55 95" width="55" height="95">
-  <!-- Teen Gohan SSJ2 - Purple gi, lightning in aura -->
-  <!-- SSJ2 Aura with lightning -->
-  <ellipse cx="27" cy="85" rx="24" ry="8" fill="#ffd700" opacity="0.35"/>
-  <path d="M10 60 Q6 40 16 20 Q22 8 27 5 Q32 8 38 20 Q48 40 44 60" fill="#ffd700" opacity="0.18"/>
-  <!-- Lightning bolts in aura -->
-  <path d="M8 45 L12 38 L10 42 L14 35" stroke="#ffffff" stroke-width="1.5" fill="none" opacity="0.8"/>
-  <path d="M46 45 L42 38 L44 42 L40 35" stroke="#ffffff" stroke-width="1.5" fill="none" opacity="0.8"/>
-  <path d="M14 25 L18 18 L16 22 L20 15" stroke="#ffffff" stroke-width="1" fill="none" opacity="0.6"/>
-  <!-- Legs -->
-  <rect x="17" y="62" width="9" height="23" rx="3" fill="#4400aa"/>
-  <rect x="29" y="62" width="9" height="23" rx="3" fill="#4400aa"/>
-  <rect x="15" y="77" width="12" height="8" rx="2" fill="#1a1a2e"/>
-  <rect x="28" y="77" width="12" height="8" rx="2" fill="#1a1a2e"/>
-  <!-- Body -->
-  <rect x="14" y="36" width="27" height="28" rx="4" fill="#4400aa"/>
-  <rect x="14" y="58" width="27" height="4" rx="1" fill="#1a1a2e"/>
-  <!-- Arms -->
-  <rect x="4" y="38" width="10" height="8" rx="3" fill="#ffcc99"/>
-  <rect x="41" y="38" width="10" height="8" rx="3" fill="#ffcc99"/>
-  <circle cx="7" cy="50" r="5" fill="#ffcc99"/>
-  <circle cx="48" cy="50" r="5" fill="#ffcc99"/>
-  <!-- Neck -->
-  <rect x="22" y="27" width="10" height="10" rx="2" fill="#ffcc99"/>
-  <!-- Head -->
-  <ellipse cx="27" cy="19" rx="13" ry="14" fill="#ffcc99"/>
-  <!-- SSJ2 teal eyes -->
-  <ellipse cx="21" cy="17" rx="3.5" ry="4" fill="#00ffcc"/>
-  <ellipse cx="33" cy="17" rx="3.5" ry="4" fill="#00ffcc"/>
-  <circle cx="22" cy="18" r="2" fill="#004433"/>
-  <circle cx="34" cy="18" r="2" fill="#004433"/>
-  <!-- Angry brows -->
-  <path d="M17 12 L24 14" stroke="#1a1a2e" stroke-width="2.5" fill="none"/>
-  <path d="M30 14 L37 12" stroke="#1a1a2e" stroke-width="2.5" fill="none"/>
-  <ellipse cx="27" cy="21" rx="1.5" ry="1.2" fill="#e8a87c"/>
-  <path d="M22 25 Q27 23 32 25" stroke="#c97b4b" stroke-width="1.5" fill="none"/>
-  <!-- SSJ2 Golden spiky hair - longer than Goku -->
-  <polygon points="27,4 18,15 14,6 12,16 8,8 11,18 17,4" fill="#ffd700"/>
-  <polygon points="27,3 36,13 40,5 42,15 46,7 42,17 36,3" fill="#ffd700"/>
-  <polygon points="18,4 27,0 36,4 32,1 27,4 22,1" fill="#ffd700"/>
-  <polygon points="13,16 9,28 13,24 11,30" fill="#ffd700"/>
-  <polygon points="41,16 45,28 41,24 43,30" fill="#ffd700"/>
-  <!-- Side hair -->
-  <rect x="14" y="15" width="4" height="12" rx="2" fill="#ffd700"/>
-  <rect x="38" y="15" width="4" height="12" rx="2" fill="#ffd700"/>
-  <!-- Gi collar -->
-  <path d="M18 36 L27 42 L36 36" stroke="#1a1a2e" stroke-width="2" fill="none"/>
-</svg>"""
+      const img = document.createElement('img');
+      img.src = char.img;
+      img.alt = char.name;
+      img.crossOrigin = 'anonymous';
+      img.style.cssText = `
+        width:100%;height:auto;display:block;
+        position:relative;z-index:2;
+        filter:drop-shadow(0 0 12px ${char.auraColor}) drop-shadow(0 4px 8px rgba(0,0,0,0.85));
+      `;
+      img.onerror = function() {
+        if (this.src !== FALLBACK_IMGS[char.id]) {
+          this.src = FALLBACK_IMGS[char.id] || '';
+        }
+        this.onerror = null;
+      };
+      wrap.appendChild(img);
+
+      const bubble = document.createElement('div');
+      bubble.id = 'bubble-' + char.id;
+      bubble.style.cssText = `
+        position:absolute;bottom:calc(100% + 10px);
+        left:50%;transform:translateX(-50%);
+        background:rgba(8,4,0,0.95);
+        border:2px solid #ff6a00;border-radius:10px;
+        padding:7px 14px;white-space:nowrap;
+        font-family:'Bangers',cursive;font-size:1rem;
+        letter-spacing:0.08em;color:#ffd700;
+        opacity:0;transition:opacity 0.3s;
+        pointer-events:none;z-index:10;
+        box-shadow:0 0 18px rgba(255,106,0,0.5);
+        text-align:center;min-width:90px;
+      `;
+      const tail = document.createElement('div');
+      tail.style.cssText = `
+        position:absolute;top:100%;left:50%;
+        transform:translateX(-50%);
+        border:7px solid transparent;
+        border-top-color:#ff6a00;
+      `;
+      bubble.appendChild(tail);
+      wrap.appendChild(bubble);
+
+      const nameTag = document.createElement('div');
+      nameTag.style.cssText = `
+        text-align:center;
+        font-family:'Bangers',cursive;
+        font-size:0.85rem;letter-spacing:0.15em;
+        color:${char.auraColor};
+        text-shadow:0 0 8px ${char.auraColor};
+        margin-top:2px;position:relative;z-index:2;
+      `;
+      nameTag.textContent = char.name.toUpperCase();
+      wrap.appendChild(nameTag);
+
+      layer.appendChild(wrap);
+      elements[char.id] = { wrap, img, bubble, aura, nameTag };
+
+      wrap.addEventListener('click', function(e) {
+        e.stopPropagation();
+        doJump(char);
+        showBubble(char, char.quotes[Math.floor(Math.random() * char.quotes.length)]);
+        spawnExplosion(char.x + char.width / 2, window.innerHeight - 80, char.auraColor);
+      });
+    });
+
+    requestAnimationFrame(tick);
+    setInterval(randomSpeech, 4000);
+    setInterval(randomInteraction, 7000);
+    setInterval(randomPowerUp, 13000);
+  }
+
+  function tick() {
+    frameCount++;
+    const W = window.innerWidth;
+
+    CHARS.forEach(char => {
+      const el = elements[char.id];
+      if (!el) return;
+
+      char.stateTimer--;
+      if (char.stateTimer <= 0) changeState(char);
+
+      if (char.isJumping) {
+        char.jumpVy += GRAVITY;
+        char.y -= char.jumpVy;
+        if (char.y <= 0) { char.y = 0; char.isJumping = false; char.jumpVy = 0; }
+      }
+
+      if (char.state === 'walk')  char.x += char.vx;
+      if (char.state === 'run')   char.x += char.vx * 2.8;
+      if (char.state === 'fight') char.x += char.vx * 1.4;
+      if (char.state === 'float') {
+        char.x += char.vx * 0.7;
+        char.y = 28 + Math.sin(frameCount * 0.018 + char.x * 0.008) * 22;
+      }
+
+      if (char.x > W - char.width - 10) {
+        char.x = W - char.width - 10;
+        char.vx = -Math.abs(char.vx);
+        char.flipped = true;
+      }
+      if (char.x < 10) {
+        char.x = 10;
+        char.vx = Math.abs(char.vx);
+        char.flipped = false;
+      }
+
+      el.wrap.style.left = char.x + 'px';
+      el.wrap.style.bottom = (char.isJumping || char.state === 'float' ? Math.max(0, char.y) : 0) + 'px';
+      el.wrap.style.transform = char.flipped ? 'scaleX(-1)' : 'scaleX(1)';
+
+      if (char.state === 'powerup') {
+        el.aura.style.opacity = '0.95';
+        el.aura.style.width = '110%';
+        el.aura.style.height = '50px';
+        el.wrap.style.filter = `drop-shadow(0 0 25px ${char.auraColor}) drop-shadow(0 0 50px ${char.glowColor}) brightness(1.3)`;
+      } else if (char.state === 'fight') {
+        el.aura.style.opacity = '0.75';
+        el.aura.style.width = '90%';
+        el.aura.style.height = '35px';
+        el.wrap.style.filter = `drop-shadow(0 0 18px ${char.auraColor}) drop-shadow(0 4px 8px rgba(0,0,0,0.8))`;
+      } else {
+        el.aura.style.opacity = '0.5';
+        el.aura.style.width = '80%';
+        el.aura.style.height = '28px';
+        el.wrap.style.filter = `drop-shadow(0 0 12px ${char.auraColor}) drop-shadow(0 4px 8px rgba(0,0,0,0.85))`;
+      }
+    });
+
+    requestAnimationFrame(tick);
+  }
+
+  function changeState(char) {
+    const r = Math.random();
+    if      (r < 0.30) { char.state='walk';  char.stateTimer=100+Math.random()*160; }
+    else if (r < 0.44) { char.state='run';   char.stateTimer=35+Math.random()*55; char.vx=(Math.random()>.5?1:-1)*char.speed; char.flipped=char.vx<0; }
+    else if (r < 0.56) { char.state='idle';  char.stateTimer=90+Math.random()*130; }
+    else if (r < 0.67) { char.state='jump';  char.stateTimer=55; doJump(char); }
+    else if (r < 0.78) { char.state='fight'; char.stateTimer=50+Math.random()*70; }
+    else if (char.id === 'frieza') { char.state='float'; char.stateTimer=140+Math.random()*140; }
+    else { char.state='walk'; char.stateTimer=120; }
+  }
+
+  function doJump(char) {
+    if (!char.isJumping) {
+      char.isJumping = true;
+      char.jumpVy = -(char.jumpHeight * 0.20);
+    }
+  }
+
+  function showBubble(char, text) {
+    const el = elements[char.id];
+    if (!el) return;
+    const existing = el.bubble.querySelector('.bubble-text');
+    if (existing) existing.remove();
+    const span = document.createElement('span');
+    span.className = 'bubble-text';
+    span.textContent = text;
+    el.bubble.insertBefore(span, el.bubble.firstChild);
+    el.bubble.style.opacity = '1';
+    setTimeout(() => { el.bubble.style.opacity = '0'; }, 2400);
+  }
+
+  function randomSpeech() {
+    const char = CHARS[Math.floor(Math.random() * CHARS.length)];
+    const pool = char.state==='fight' ? char.fightQuotes : char.state==='powerup' ? char.powerUpQuotes : char.quotes;
+    showBubble(char, pool[Math.floor(Math.random() * pool.length)]);
+  }
+
+  function randomInteraction() {
+    if (CHARS.length < 2) return;
+    let i = Math.floor(Math.random() * CHARS.length);
+    let j = Math.floor(Math.random() * CHARS.length);
+    while (j === i) j = Math.floor(Math.random() * CHARS.length);
+    const from = CHARS[i], to = CHARS[j];
+    showBubble(from, from.fightQuotes[Math.floor(Math.random() * from.fightQuotes.length)]);
+    from.state = 'fight'; from.stateTimer = 70;
+    spawnKiBlast(from, to);
+  }
+
+  function spawnKiBlast(from, to) {
+    const blast = document.createElement('div');
+    const size = 18 + Math.random() * 14;
+    const startX = from.x + from.width / 2;
+    const startY = window.innerHeight - 120;
+    const endX   = to.x + to.width / 2;
+    const endY   = window.innerHeight - 120;
+    blast.style.cssText = `
+      position:fixed;
+      left:${startX}px;top:${startY}px;
+      width:${size}px;height:${size}px;
+      border-radius:50%;
+      background:radial-gradient(circle,#fff 0%,${from.auraColor} 50%,transparent 100%);
+      box-shadow:0 0 20px ${from.auraColor},0 0 40px ${from.glowColor};
+      pointer-events:none;z-index:6;
+      transform:translate(-50%,-50%);
+    `;
+    document.body.appendChild(blast);
+    const dx = endX - startX, dy = endY - startY;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    const dur = Math.max(250, dist * 0.7);
+    let start = null;
+    function anim(ts) {
+      if (!start) start = ts;
+      const p = Math.min(1, (ts - start) / dur);
+      const arcY = -130 * Math.sin(Math.PI * p);
+      blast.style.left  = (startX + dx * p) + 'px';
+      blast.style.top   = (startY + dy * p + arcY) + 'px';
+      blast.style.opacity = String(1 - p * 0.3);
+      blast.style.transform = `translate(-50%,-50%) scale(${1 + p * 0.5})`;
+      if (p < 1) { requestAnimationFrame(anim); }
+      else {
+        spawnExplosion(endX, endY, from.auraColor);
+        blast.remove();
+        const toChar = CHARS.find(c => c.id === to.id);
+        if (toChar) showBubble(toChar, toChar.quotes[Math.floor(Math.random() * toChar.quotes.length)]);
+      }
+    }
+    requestAnimationFrame(anim);
+  }
+
+  function spawnExplosion(x, y, color) {
+    for (let i = 0; i < 7; i++) {
+      const exp = document.createElement('div');
+      const sz = 24 + Math.random() * 36;
+      const ox = (Math.random() - 0.5) * 60;
+      const oy = (Math.random() - 0.5) * 40;
+      exp.style.cssText = `
+        position:fixed;
+        left:${x + ox - sz/2}px;top:${y + oy - sz/2}px;
+        width:${sz}px;height:${sz}px;
+        border-radius:50%;
+        background:radial-gradient(circle,#fff 0%,${color} 40%,transparent 100%);
+        box-shadow:0 0 30px ${color};
+        pointer-events:none;z-index:7;
+        animation:explodeAnim 0.6s ease-out forwards;
+        animation-delay:${i * 0.04}s;
+      `;
+      document.body.appendChild(exp);
+      setTimeout(() => exp.remove(), 700 + i * 45);
+    }
+  }
+
+  function randomPowerUp() {
+    const char = CHARS[Math.floor(Math.random() * CHARS.length)];
+    const el = elements[char.id];
+    if (!el) return;
+    char.state = 'powerup'; char.stateTimer = 130;
+    showBubble(char, char.powerUpQuotes[Math.floor(Math.random() * char.powerUpQuotes.length)]);
+    spawnExplosion(char.x + char.width/2, window.innerHeight - 80, char.auraColor);
+    if (char.id === 'goku' && char.imgSSJ && !char.isSSJ && Math.random() > 0.35) {
+      char.isSSJ = true;
+      el.img.src = char.imgSSJ;
+      el.aura.style.background = '#ffd700';
+      el.aura.style.height = '60px';
+      el.aura.style.opacity = '0.9';
+      el.wrap.style.filter = 'drop-shadow(0 0 30px #ffd700) drop-shadow(0 0 60px #ff6a00) brightness(1.4)';
+      setTimeout(() => {
+        char.isSSJ = false;
+        el.img.src = char.img;
+        el.aura.style.background = char.auraColor;
+        el.aura.style.height = '28px';
+        el.aura.style.opacity = '0.5';
+      }, 18000);
+    }
+  }
+
+  document.addEventListener('click', function(e) {
+    if (e.target.closest && e.target.closest('#characters-layer')) return;
+    spawnKiParticle(e.clientX, e.clientY);
+  });
+
+  function spawnKiParticle(x, y) {
+    const p = document.createElement('div');
+    p.className = 'ki-particle';
+    const s = 10 + Math.random() * 15;
+    p.style.cssText = `left:${x-s/2}px;top:${y-s/2}px;width:${s}px;height:${s}px`;
+    document.body.appendChild(p);
+    setTimeout(() => p.remove(), 600);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    setTimeout(init, 100);
+  }
+
+  window.dbzSpawnExplosion = spawnExplosion;
+})();
+"""
 
 BASE_STYLE = """
 @import url('https://fonts.googleapis.com/css2?family=Bangers&family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&display=swap');
@@ -389,141 +423,40 @@ BASE_STYLE = """
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
-body{
-  background:var(--dark);color:#f5e6c8;
-  font-family:'Rajdhani',sans-serif;min-height:100vh;
-  overflow-x:hidden;cursor:crosshair;
-}
-body::before{
-  content:'';position:fixed;inset:0;z-index:0;
-  background:
-    radial-gradient(ellipse 80% 60% at 50% 0%,#ff6a0022 0%,transparent 70%),
-    radial-gradient(ellipse 40% 40% at 80% 80%,#ffd70011 0%,transparent 60%),
-    radial-gradient(ellipse 60% 40% at 20% 60%,#ff220011 0%,transparent 60%),
-    linear-gradient(180deg,#0a0500 0%,#0d0300 50%,#080200 100%);
-  pointer-events:none;
-}
-body::after{
-  content:'';position:fixed;inset:0;z-index:0;
-  background-image:
-    radial-gradient(circle 1px at 20% 30%,#ff6a0033 0%,transparent 1px),
-    radial-gradient(circle 1px at 80% 70%,#ffd70022 0%,transparent 1px),
-    radial-gradient(circle 2px at 10% 80%,#ff6a0044 0%,transparent 2px),
-    radial-gradient(circle 1px at 90% 20%,#ffd70033 0%,transparent 1px);
-  animation:stardrift 20s linear infinite;
-  pointer-events:none;
-}
+body{background:var(--dark);color:#f5e6c8;font-family:'Rajdhani',sans-serif;min-height:100vh;overflow-x:hidden;cursor:crosshair}
+body::before{content:'';position:fixed;inset:0;z-index:0;background:radial-gradient(ellipse 80% 60% at 50% 0%,#ff6a0022 0%,transparent 70%),radial-gradient(ellipse 40% 40% at 80% 80%,#ffd70011 0%,transparent 60%),linear-gradient(180deg,#0a0500 0%,#0d0300 50%,#080200 100%);pointer-events:none}
+body::after{content:'';position:fixed;inset:0;z-index:0;background-image:radial-gradient(circle 1px at 20% 30%,#ff6a0033 0%,transparent 1px),radial-gradient(circle 1px at 80% 70%,#ffd70022 0%,transparent 1px),radial-gradient(circle 2px at 10% 80%,#ff6a0044 0%,transparent 2px),radial-gradient(circle 1px at 90% 20%,#ffd70033 0%,transparent 1px);animation:stardrift 20s linear infinite;pointer-events:none}
 @keyframes stardrift{0%{transform:translateY(0)}100%{transform:translateY(-100px)}}
 
 /* ── CHARACTERS LAYER ── */
-#characters-layer{
-  position:fixed;inset:0;z-index:2;pointer-events:none;overflow:hidden;
-}
-.dbz-character{
-  position:absolute;bottom:0;
-  pointer-events:none;
-  transition:transform .1s linear;
-  filter:drop-shadow(0 0 8px rgba(255,180,0,.5));
-}
-.dbz-character.flipped{transform:scaleX(-1)}
-.dbz-character.flipped.jumping{transform:scaleX(-1) translateY(var(--jump-y,0px))}
-.dbz-character.jumping{transform:translateY(var(--jump-y,0px))}
-
-/* character aura glow */
-.char-aura{
-  position:absolute;bottom:-5px;left:50%;transform:translateX(-50%);
-  border-radius:50%;filter:blur(8px);
-  animation:auraPulse 1.5s ease-in-out infinite alternate;
-}
-@keyframes auraPulse{0%{opacity:.4;transform:translateX(-50%) scale(.8)}100%{opacity:.9;transform:translateX(-50%) scale(1.2)}}
-
-/* speech bubble */
-.speech-bubble{
-  position:absolute;bottom:105%;left:50%;transform:translateX(-50%);
-  background:rgba(10,5,0,.92);border:2px solid var(--orange);
-  border-radius:8px;padding:6px 12px;white-space:nowrap;
-  font-family:'Bangers',cursive;font-size:.85rem;letter-spacing:.08em;
-  color:var(--yellow);
-  opacity:0;transition:opacity .3s;
-  pointer-events:none;z-index:10;
-  box-shadow:0 0 15px rgba(255,106,0,.4);
-  min-width:80px;text-align:center;
-}
-.speech-bubble::after{
-  content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);
-  border:6px solid transparent;border-top-color:var(--orange);
-}
-.speech-bubble.visible{opacity:1}
-
-/* ki blast projectile */
-.ki-blast-projectile{
-  position:fixed;border-radius:50%;pointer-events:none;z-index:5;
-  animation:kiTravelAnim .4s linear forwards;
-}
-@keyframes kiTravelAnim{
-  0%{transform:scale(1);opacity:1}
-  100%{transform:scale(0.2);opacity:0}
-}
-
-/* power-up explosion */
-.powerup-explosion{
-  position:fixed;border-radius:50%;pointer-events:none;z-index:6;
-  animation:explodeAnim .6s ease-out forwards;
-}
-@keyframes explodeAnim{
-  0%{transform:scale(0);opacity:1}
-  60%{opacity:.8}
-  100%{transform:scale(4);opacity:0}
-}
+#characters-layer{position:fixed;inset:0;z-index:4;pointer-events:none;overflow:hidden}
+#characters-layer > div{pointer-events:auto}
+@keyframes auraPulse{0%{opacity:.35;transform:translateX(-50%) scale(.85)}100%{opacity:.75;transform:translateX(-50%) scale(1.15)}}
+@keyframes explodeAnim{0%{transform:scale(0);opacity:1}60%{opacity:.8}100%{transform:scale(4);opacity:0}}
 
 /* ── ENERGY LINES ── */
 .energy-lines{position:fixed;inset:0;z-index:1;pointer-events:none;overflow:hidden}
-.energy-lines span{
-  position:absolute;height:1px;
-  background:linear-gradient(90deg,transparent,#ff6a0055,transparent);
-  animation:energyflow 3s linear infinite;opacity:0;
-}
-@keyframes energyflow{
-  0%{opacity:0;transform:scaleX(0) translateX(-100%)}
-  20%{opacity:1}80%{opacity:1}
-  100%{opacity:0;transform:scaleX(1) translateX(100%)}
-}
+.energy-lines span{position:absolute;height:1px;background:linear-gradient(90deg,transparent,#ff6a0055,transparent);animation:energyflow 3s linear infinite;opacity:0}
+@keyframes energyflow{0%{opacity:0;transform:scaleX(0) translateX(-100%)}20%{opacity:1}80%{opacity:1}100%{opacity:0;transform:scaleX(1) translateX(100%)}}
 
 /* ── HEADER ── */
-.header{
-  position:sticky;top:0;z-index:100;
-  padding:1rem 2rem;
-  display:flex;align-items:center;justify-content:space-between;
-  background:linear-gradient(180deg,rgba(10,5,0,.98) 0%,rgba(10,5,0,.9) 100%);
-  border-bottom:2px solid var(--orange);
-  box-shadow:0 2px 30px #ff6a0044,0 0 60px #ff6a0011;
-}
-.header::after{
-  content:'';position:absolute;bottom:-4px;left:0;right:0;height:2px;
-  background:linear-gradient(90deg,transparent,var(--yellow),var(--orange),var(--yellow),transparent);
-  animation:headershine 3s linear infinite;
-}
+.header{position:sticky;top:0;z-index:100;padding:1rem 2rem;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(180deg,rgba(10,5,0,.98) 0%,rgba(10,5,0,.9) 100%);border-bottom:2px solid var(--orange);box-shadow:0 2px 30px #ff6a0044,0 0 60px #ff6a0011}
+.header::after{content:'';position:absolute;bottom:-4px;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--yellow),var(--orange),var(--yellow),transparent);animation:headershine 3s linear infinite}
 @keyframes headershine{0%{opacity:.3}50%{opacity:1}100%{opacity:.3}}
-.logo{
-  font-family:'Bangers',cursive;font-size:2rem;letter-spacing:.15em;
-  text-decoration:none;
-  background:linear-gradient(135deg,var(--yellow) 0%,var(--orange) 50%,var(--red) 100%);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
-  filter:drop-shadow(0 0 10px #ff6a0088);transition:filter .3s;
-}
+.logo{font-family:'Bangers',cursive;font-size:2rem;letter-spacing:.15em;text-decoration:none;background:linear-gradient(135deg,var(--yellow) 0%,var(--orange) 50%,var(--red) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 10px #ff6a0088);transition:filter .3s}
 .logo:hover{filter:drop-shadow(0 0 20px #ffd700)}
-.logo span{background:linear-gradient(135deg,#fff 0%,var(--yellow) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.logo span{background:linear-gradient(135deg,#fff 0%,var(--yellow) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .power-level{font-family:'Bangers',cursive;font-size:.9rem;letter-spacing:.1em;color:var(--yellow);border:1px solid var(--orange);padding:4px 12px;border-radius:2px;background:rgba(255,106,0,.1);box-shadow:0 0 10px #ff6a0033;animation:powerpulse 2s ease-in-out infinite}
 @keyframes powerpulse{0%,100%{box-shadow:0 0 10px #ff6a0033}50%{box-shadow:0 0 20px #ff6a0077}}
 nav{display:flex;align-items:center;gap:1.5rem}
-nav a{color:#c8a878;text-decoration:none;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:.85rem;letter-spacing:.15em;text-transform:uppercase;transition:all .2s;position:relative;}
+nav a{color:#c8a878;text-decoration:none;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:.85rem;letter-spacing:.15em;text-transform:uppercase;transition:all .2s;position:relative}
 nav a::after{content:'';position:absolute;bottom:-4px;left:0;right:0;height:2px;background:var(--orange);transform:scaleX(0);transition:transform .2s}
 nav a:hover{color:var(--yellow);text-shadow:0 0 10px #ffd70088}
-nav a:hover::after{transform:scaleX(1)}
+nav a:hover::after,nav a.active::after{transform:scaleX(1)}
 nav a.active{color:var(--orange)}
 
 /* ── BUTTONS ── */
-.btn{padding:.75rem 1.75rem;font-family:'Bangers',cursive;font-size:1rem;letter-spacing:.15em;border:2px solid var(--orange);background:linear-gradient(135deg,rgba(255,106,0,.15),rgba(255,50,0,.05));color:var(--yellow);cursor:pointer;border-radius:2px;transition:all .2s;position:relative;overflow:hidden;text-transform:uppercase;}
+.btn{padding:.75rem 1.75rem;font-family:'Bangers',cursive;font-size:1rem;letter-spacing:.15em;border:2px solid var(--orange);background:linear-gradient(135deg,rgba(255,106,0,.15),rgba(255,50,0,.05));color:var(--yellow);cursor:pointer;border-radius:2px;transition:all .2s;position:relative;overflow:hidden;text-transform:uppercase}
 .btn::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,var(--orange),var(--red));opacity:0;transition:opacity .2s}
 .btn:hover{color:#fff;box-shadow:0 0 20px #ff6a0066;transform:translateY(-2px)}
 .btn:hover::before{opacity:.2}
@@ -533,13 +466,13 @@ nav a.active{color:var(--orange)}
 .btn-red{border-color:var(--red)!important;color:var(--red)!important}
 .btn-blue{border-color:var(--blue)!important;color:var(--blue)!important}
 .btn-sm{padding:.35rem .8rem;font-size:.8rem}
-.btn-ki{border-color:var(--yellow);background:linear-gradient(135deg,rgba(255,215,0,.2),rgba(255,106,0,.1));}
+.btn-ki{border-color:var(--yellow);background:linear-gradient(135deg,rgba(255,215,0,.2),rgba(255,106,0,.1))}
 .btn-ki:hover{box-shadow:0 0 30px #ffd70088,0 0 60px #ff6a0044;color:#fff}
 
-/* ── CONTAINERS ── */
+/* ── LAYOUT ── */
 .container{max-width:480px;margin:4rem auto;padding:0 1rem;position:relative;z-index:10}
 .wide{max-width:1100px;margin:2rem auto;padding:0 1rem;position:relative;z-index:10}
-.card{background:linear-gradient(135deg,rgba(18,8,0,.97),rgba(10,5,0,.99));border:1px solid var(--orange);border-radius:4px;padding:2rem;box-shadow:0 0 40px #ff6a0022,inset 0 0 40px rgba(255,106,0,.03);position:relative;overflow:hidden;}
+.card{background:linear-gradient(135deg,rgba(18,8,0,.97),rgba(10,5,0,.99));border:1px solid var(--orange);border-radius:4px;padding:2rem;box-shadow:0 0 40px #ff6a0022,inset 0 0 40px rgba(255,106,0,.03);position:relative;overflow:hidden}
 .card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,var(--orange),var(--yellow),var(--orange),transparent);animation:cardshine 4s linear infinite}
 @keyframes cardshine{0%{opacity:.5}50%{opacity:1}100%{opacity:.5}}
 .card h2{font-family:'Bangers',cursive;font-size:1.8rem;letter-spacing:.2em;color:var(--orange);margin-bottom:1.5rem;text-shadow:0 0 20px #ff6a0066}
@@ -614,12 +547,11 @@ tr:hover td{background:rgba(255,106,0,.05)}
 .stat-label2{font-size:.7rem;color:#c8a878;letter-spacing:.2em;margin-top:.2rem;font-weight:700;text-transform:uppercase}
 .timer-box{display:inline-block;background:rgba(0,0,0,.8);border:2px solid var(--orange);padding:1rem 2.5rem;border-radius:4px;margin-bottom:2rem;position:relative}
 .timer-box::before,.timer-box::after{content:'◆';position:absolute;top:50%;transform:translateY(-50%);color:var(--orange);font-size:.6rem}
-.timer-box::before{left:.5rem}
-.timer-box::after{right:.5rem}
+.timer-box::before{left:.5rem}.timer-box::after{right:.5rem}
 .timer-label{font-size:.65rem;color:#c8a878;letter-spacing:.3em;margin-bottom:.25rem;font-weight:700;text-transform:uppercase}
 .timer{font-family:'Bangers',cursive;font-size:2.5rem;color:var(--yellow);letter-spacing:.1em}
 
-/* ── CHALLENGES ── */
+/* ── SECTION / CHALLENGES ── */
 .section{padding:2rem;max-width:1200px;margin:0 auto;position:relative;z-index:10}
 .challenges-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem}
 .challenge-card{background:linear-gradient(135deg,rgba(18,8,0,.95),rgba(10,5,0,.98));border:1px solid rgba(255,106,0,.25);border-radius:4px;padding:1.25rem;cursor:pointer;transition:all .25s;position:relative;overflow:hidden}
@@ -677,11 +609,11 @@ tr:hover td{background:rgba(255,106,0,.05)}
 .feed-team{color:var(--yellow);font-weight:700}
 .feed-pts{color:var(--orange);margin-left:auto;font-family:'Bangers',cursive;font-size:1.1rem}
 
-/* ── SCOREBOARD GRAPH ── */
+/* ── SCOREBOARD ── */
 .graph-container{background:rgba(0,0,0,.5);border:1px solid rgba(255,106,0,.2);border-radius:4px;padding:1.5rem;margin-bottom:2rem}
 .graph-title{font-family:'Bangers',cursive;font-size:1.1rem;color:var(--orange);letter-spacing:.2em;margin-bottom:1rem}
 
-/* ── USER/AUTH ── */
+/* ── USER BAR ── */
 .user-bar{display:flex;align-items:center;gap:.75rem}
 .user-badge{font-family:'Bangers',cursive;font-size:.9rem;letter-spacing:.1em;color:var(--yellow);border:1px solid rgba(255,215,0,.4);padding:4px 12px;border-radius:2px;background:rgba(255,215,0,.1)}
 .logout-btn{font-family:'Bangers',cursive;font-size:.85rem;letter-spacing:.1em;color:#c8a878;cursor:pointer;border:1px solid rgba(255,106,0,.3);padding:4px 12px;border-radius:2px;background:none;transition:all .2s}
@@ -714,9 +646,9 @@ tr:hover td{background:rgba(255,106,0,.05)}
 TIMER_JS = """
 function updateTimer() {
   const start = new Date("{{ start_time }}").getTime();
-  const end = new Date("{{ end_time }}").getTime();
-  const now = new Date().getTime();
-  const timerEl = document.getElementById('timer');
+  const end   = new Date("{{ end_time }}").getTime();
+  const now   = new Date().getTime();
+  const timerEl    = document.getElementById('timer');
   const timerLabel = document.getElementById('timer-label');
   if (!timerEl) return;
   if (!start || isNaN(start)) { timerEl.textContent = 'OPEN'; return; }
@@ -742,416 +674,6 @@ function formatTime(ms) {
 }
 updateTimer();
 setInterval(updateTimer, 1000);
-"""
-
-# ── AUTONOMOUS CHARACTER ENGINE ──────────────────────────────────────
-CHARACTER_JS = """
-(function() {
-  // ── Character definitions ──
-  const CHARS = [
-    {
-      id:'goku', name:'Goku', svg:`""" + GOKU_SVG.replace('`','\\`') + """`,
-      ssjSvg:`""" + GOKU_SSJ_SVG.replace('`','\\`') + """`,
-      auraColor:'#ffd700', auraSize:'50px 20px',
-      quotes:['KAMEHAMEHA!!','I am always a step behind...','I need to get stronger!','You can do this!','KAIO-KEN x10!','My power is rising!','Time to power up!'],
-      fightQuotes:['KAMEHAMEHA!!','KAIO-KEN!!','This ends NOW!'],
-      powerUpQuotes:["I'M GOING SUPER SAIYAN!",'AAAAHHHHH!!!','FULL POWER!!'],
-      speed:1.8, jumpHeight:180, size:60, isSSJ:false,
-      x:100, y:0, vx:1.8, state:'walk', stateTimer:0,
-      jumpVy:0, isJumping:false, flipped:false,
-    },
-    {
-      id:'vegeta', name:'Vegeta', svg:`""" + VEGETA_SVG.replace('`','\\`') + """`,
-      ssjSvg:null,
-      auraColor:'#8800ff', auraSize:'45px 18px',
-      quotes:['I am the PRINCE of Saiyans!','Kakarot... you fool.','My power is MAXIMUM!','Over 9000!!','FINAL FLASH!!','You pathetic weakling!','This battle is MINE!'],
-      fightQuotes:['FINAL FLASH!!','GALICK GUN!!','I will destroy you!'],
-      powerUpQuotes:['MY PRIDE...!','VEGETA DOES NOT LOSE!','FINAL BURST!!'],
-      speed:2, jumpHeight:160, size:60, isSSJ:false,
-      x:600, y:0, vx:-2, state:'walk', stateTimer:0,
-      jumpVy:0, isJumping:false, flipped:true,
-    },
-    {
-      id:'piccolo', name:'Piccolo', svg:`""" + PICCOLO_SVG.replace('`','\\`') + """`,
-      ssjSvg:null,
-      auraColor:'#4400aa', auraSize:'48px 18px',
-      quotes:['Gohan...','Special Beam Cannon!','Silence.','I sense a great power...','Training never ends.','MAKANKOSAPPO!!','Hmph.'],
-      fightQuotes:['SPECIAL BEAM CANNON!!','HELLZONE GRENADE!!','You are no match for me!'],
-      powerUpQuotes:['My power grows...','UNLIMITED POWER!!','Feel my ki!!'],
-      speed:1.5, jumpHeight:200, size:60, isSSJ:false,
-      x:900, y:0, vx:1.5, state:'meditate', stateTimer:300,
-      jumpVy:0, isJumping:false, flipped:false,
-    },
-    {
-      id:'frieza', name:'Frieza', svg:`""" + FRIEZA_SVG.replace('`','\\`') + """`,
-      ssjSvg:null,
-      auraColor:'#aa00cc', auraSize:'50px 20px',
-      quotes:["I am the greatest in the universe!",'Pathetic creatures...','DEATH BEAM!!','No one can stop me!','You dare challenge me?','How... delightful.','Kneel before me!'],
-      fightQuotes:['DEATH BALL!!','SUPERNOVA!!','You will all perish!'],
-      powerUpQuotes:['100% POWER!!','UNLIMITED POWER!!','TREMBLE BEFORE ME!!'],
-      speed:1.6, jumpHeight:220, size:60, isSSJ:false,
-      x:1200, y:0, vx:-1.6, state:'float', stateTimer:200,
-      jumpVy:0, isJumping:false, flipped:true,
-    },
-    {
-      id:'krillin', name:'Krillin', svg:`""" + KRILLIN_SVG.replace('`','\\`') + """`,
-      ssjSvg:null,
-      auraColor:'#ffaa00', auraSize:'35px 14px',
-      quotes:['DESTRUCTO DISC!!','G-Goku!','I can fight too!','SOLAR FLARE!!','I am not afraid!','Huh?! Oh no...','F-FINAL FORM?!'],
-      fightQuotes:['DESTRUCTO DISC!!','SOLAR FLARE!','Take this!!'],
-      powerUpQuotes:['Give me strength!','For my friends!','FULL POWER!'],
-      speed:2.2, jumpHeight:140, size:50, isSSJ:false,
-      x:400, y:0, vx:2.2, state:'walk', stateTimer:0,
-      jumpVy:0, isJumping:false, flipped:false,
-    },
-    {
-      id:'gohan', name:'Gohan', svg:`""" + GOHAN_SVG.replace('`','\\`') + """`,
-      ssjSvg:null,
-      auraColor:'#ffd700', auraSize:'50px 20px',
-      quotes:["It's over!","I won't let you hurt them!",'MASENKO!!','SSJ2 UNLOCKED!!','FATHER!!','Ultimate Gohan!!','THIS POWER...!'],
-      fightQuotes:['MASENKO HA!!','FATHER-SON KAMEHAMEHA!!','THIS ENDS NOW!!'],
-      powerUpQuotes:['RAAAHHHHH!!!','SSJ2!!!','UNLIMITED POWER!!!'],
-      speed:1.9, jumpHeight:190, size:55, isSSJ:false,
-      x:750, y:0, vx:-1.9, state:'walk', stateTimer:0,
-      jumpVy:0, isJumping:false, flipped:true,
-    },
-  ];
-
-  const GRAVITY = 0.8;
-  const FLOOR = 0;
-  const states = ['walk','run','jump','powerup','fight','idle','meditate','float'];
-  let frameCount = 0;
-  let elements = {};
-
-  function init() {
-    const layer = document.getElementById('characters-layer');
-    if (!layer) return;
-    CHARS.forEach(char => {
-      // Wrap
-      const wrap = document.createElement('div');
-      wrap.className = 'dbz-character';
-      wrap.id = 'char-' + char.id;
-      wrap.style.cssText = `left:${char.x}px;bottom:${char.y}px;width:${char.size}px;height:auto;z-index:2;position:absolute`;
-
-      // Aura
-      const aura = document.createElement('div');
-      aura.className = 'char-aura';
-      aura.style.cssText = `width:${char.auraSize};background:${char.auraColor};height:20px;opacity:0.5;bottom:-5px`;
-      wrap.appendChild(aura);
-
-      // SVG
-      const svgEl = document.createElement('div');
-      svgEl.className = 'char-svg';
-      svgEl.innerHTML = char.svg;
-      svgEl.style.cssText = `display:block;position:relative;z-index:2`;
-      wrap.appendChild(svgEl);
-
-      // Speech bubble
-      const bubble = document.createElement('div');
-      bubble.className = 'speech-bubble';
-      bubble.id = 'bubble-' + char.id;
-      wrap.appendChild(bubble);
-
-      layer.appendChild(wrap);
-      elements[char.id] = { wrap, svgEl, bubble, aura };
-    });
-
-    // Start engine
-    requestAnimationFrame(tick);
-    // Random speeches
-    setInterval(randomSpeech, 3500);
-    // Random interactions
-    setInterval(randomInteraction, 6000);
-    // Power-ups
-    setInterval(randomPowerUp, 12000);
-  }
-
-  function tick() {
-    frameCount++;
-    const W = window.innerWidth;
-
-    CHARS.forEach(char => {
-      const el = elements[char.id];
-      if (!el) return;
-
-      // ── STATE MACHINE ──
-      char.stateTimer--;
-      if (char.stateTimer <= 0) {
-        changeState(char);
-      }
-
-      // ── PHYSICS ──
-      if (char.isJumping) {
-        char.jumpVy += GRAVITY;
-        char.y -= char.jumpVy;
-        if (char.y <= 0) {
-          char.y = 0;
-          char.isJumping = false;
-          char.jumpVy = 0;
-        }
-      }
-
-      // ── MOVEMENT ──
-      switch(char.state) {
-        case 'walk':
-          char.x += char.vx;
-          break;
-        case 'run':
-          char.x += char.vx * 2.5;
-          break;
-        case 'float':
-          char.x += char.vx * 0.8;
-          char.y = 30 + Math.sin(frameCount * 0.02 + char.x * 0.01) * 20;
-          break;
-        case 'fight':
-          char.x += char.vx * 1.5;
-          break;
-        case 'idle':
-        case 'meditate':
-        case 'powerup':
-          // stay
-          break;
-      }
-
-      // ── BOUNDARY ──
-      if (char.x > W - char.size - 10) {
-        char.x = W - char.size - 10;
-        char.vx = -Math.abs(char.vx);
-        char.flipped = true;
-      }
-      if (char.x < 10) {
-        char.x = 10;
-        char.vx = Math.abs(char.vx);
-        char.flipped = false;
-      }
-
-      // ── APPLY TRANSFORM ──
-      const jumpOffset = char.isJumping ? char.y : (char.state==='float' ? char.y : 0);
-      el.wrap.style.left = char.x + 'px';
-      el.wrap.style.bottom = (char.state==='float' ? char.y : 0) + 'px';
-      el.wrap.style.transform = char.flipped ? 'scaleX(-1)' : 'scaleX(1)';
-
-      // ── JUMPING OFFSET ──
-      if (char.isJumping) {
-        el.wrap.style.bottom = Math.max(0, char.y) + 'px';
-      }
-
-      // ── AURA INTENSITY ──
-      if (char.state === 'powerup') {
-        el.aura.style.opacity = '0.9';
-        el.aura.style.width = '80px';
-        el.aura.style.height = '30px';
-        el.aura.style.filter = 'blur(6px)';
-      } else if (char.state === 'fight') {
-        el.aura.style.opacity = '0.7';
-        el.aura.style.width = '60px';
-        el.aura.style.height = '22px';
-      } else if (char.state === 'meditate') {
-        el.aura.style.opacity = '0.3';
-        el.aura.style.width = '40px';
-      } else {
-        el.aura.style.opacity = '0.5';
-        el.aura.style.width = char.auraSize.split(' ')[0];
-        el.aura.style.height = '18px';
-        el.aura.style.filter = 'blur(8px)';
-      }
-    });
-
-    requestAnimationFrame(tick);
-  }
-
-  function changeState(char) {
-    const roll = Math.random();
-    if (roll < 0.35) {
-      char.state = 'walk';
-      char.stateTimer = 100 + Math.random() * 150;
-    } else if (roll < 0.50) {
-      char.state = 'run';
-      char.stateTimer = 40 + Math.random() * 60;
-      char.vx = (Math.random() > 0.5 ? 1 : -1) * char.speed;
-      char.flipped = char.vx < 0;
-    } else if (roll < 0.62) {
-      char.state = 'idle';
-      char.stateTimer = 80 + Math.random() * 120;
-    } else if (roll < 0.72) {
-      char.state = 'jump';
-      char.stateTimer = 60;
-      doJump(char);
-    } else if (roll < 0.82) {
-      char.state = 'fight';
-      char.stateTimer = 50 + Math.random() * 80;
-    } else if (char.id === 'piccolo' && roll < 0.92) {
-      char.state = 'meditate';
-      char.stateTimer = 200 + Math.random() * 200;
-    } else if (char.id === 'frieza' && roll < 0.92) {
-      char.state = 'float';
-      char.stateTimer = 150 + Math.random() * 150;
-    } else {
-      char.state = 'walk';
-      char.stateTimer = 120;
-    }
-  }
-
-  function doJump(char) {
-    if (!char.isJumping) {
-      char.isJumping = true;
-      char.jumpVy = -(char.jumpHeight * 0.22);
-    }
-  }
-
-  function randomSpeech() {
-    const char = CHARS[Math.floor(Math.random() * CHARS.length)];
-    const el = elements[char.id];
-    if (!el) return;
-    const quotes = char.state === 'fight' ? char.fightQuotes
-      : char.state === 'powerup' ? char.powerUpQuotes
-      : char.quotes;
-    const q = quotes[Math.floor(Math.random() * quotes.length)];
-    showBubble(char, q);
-  }
-
-  function showBubble(char, text) {
-    const el = elements[char.id];
-    if (!el) return;
-    el.bubble.textContent = text;
-    el.bubble.classList.add('visible');
-    setTimeout(() => el.bubble.classList.remove('visible'), 2200);
-  }
-
-  function randomInteraction() {
-    // Pick two characters and make them face each other
-    if (CHARS.length < 2) return;
-    const i = Math.floor(Math.random() * CHARS.length);
-    let j = Math.floor(Math.random() * CHARS.length);
-    while (j === i) j = Math.floor(Math.random() * CHARS.length);
-    const a = CHARS[i], b = CHARS[j];
-
-    // Shoot ki blast from a to b
-    if (Math.random() > 0.4) {
-      spawnKiBlast(a, b);
-    }
-  }
-
-  function spawnKiBlast(from, to) {
-    const el = elements[from.id];
-    if (!el) return;
-    // Show fight quote
-    const q = from.fightQuotes[Math.floor(Math.random() * from.fightQuotes.length)];
-    showBubble(from, q);
-    from.state = 'fight';
-    from.stateTimer = 60;
-
-    // Create projectile
-    const blast = document.createElement('div');
-    blast.className = 'ki-blast-projectile';
-    const size = 12 + Math.random() * 16;
-    const startX = from.x + from.size / 2;
-    const startY = window.innerHeight - from.y - 60;
-    const endX = to.x + to.size / 2;
-    const endY = window.innerHeight - to.y - 60;
-    blast.style.cssText = `
-      left:${startX}px;top:${startY}px;
-      width:${size}px;height:${size}px;
-      background:radial-gradient(circle,#fff,${from.auraColor});
-      box-shadow:0 0 15px ${from.auraColor};
-      position:fixed;
-    `;
-    document.body.appendChild(blast);
-
-    // Animate across screen
-    const dx = endX - startX;
-    const dy = endY - startY;
-    const dist = Math.sqrt(dx*dx + dy*dy);
-    const duration = Math.max(300, dist * 0.8);
-    let start = null;
-    function animBlast(ts) {
-      if (!start) start = ts;
-      const p = Math.min(1, (ts - start) / duration);
-      blast.style.left = (startX + dx * p) + 'px';
-      blast.style.top = (startY + dy * p) + 'px';
-      blast.style.opacity = 1 - p;
-      if (p < 1) requestAnimationFrame(animBlast);
-      else {
-        // Impact explosion
-        spawnExplosion(endX, endY, from.auraColor);
-        blast.remove();
-        // Target reacts
-        const q2 = to.quotes[Math.floor(Math.random() * to.quotes.length)];
-        showBubble(to, q2);
-      }
-    }
-    requestAnimationFrame(animBlast);
-  }
-
-  function spawnExplosion(x, y, color) {
-    for (let i = 0; i < 5; i++) {
-      const exp = document.createElement('div');
-      exp.className = 'powerup-explosion';
-      const size = 20 + Math.random() * 30;
-      exp.style.cssText = `
-        left:${x + (Math.random()-0.5)*30 - size/2}px;
-        top:${y + (Math.random()-0.5)*30 - size/2}px;
-        width:${size}px;height:${size}px;
-        background:radial-gradient(circle,#fff,${color});
-        box-shadow:0 0 20px ${color};
-        animation-delay:${i*0.05}s;
-      `;
-      document.body.appendChild(exp);
-      setTimeout(() => exp.remove(), 700 + i * 50);
-    }
-  }
-
-  function randomPowerUp() {
-    const char = CHARS[Math.floor(Math.random() * CHARS.length)];
-    const el = elements[char.id];
-    if (!el) return;
-    char.state = 'powerup';
-    char.stateTimer = 120;
-    const q = char.powerUpQuotes[Math.floor(Math.random() * char.powerUpQuotes.length)];
-    showBubble(char, q);
-
-    // SSJ transform for Goku
-    if (char.id === 'goku' && !char.isSSJ && Math.random() > 0.4) {
-      char.isSSJ = true;
-      el.svgEl.innerHTML = char.ssjSvg;
-      el.aura.style.background = '#ffd700';
-      spawnExplosion(char.x + char.size/2, window.innerHeight - 80, '#ffd700');
-      setTimeout(() => {
-        char.isSSJ = false;
-        el.svgEl.innerHTML = char.svg;
-        el.aura.style.background = char.auraColor;
-      }, 15000);
-    } else {
-      // Generic powerup burst
-      spawnExplosion(char.x + char.size/2, window.innerHeight - 80, char.auraColor);
-    }
-  }
-
-  // Click on character to interact
-  document.addEventListener('click', function(e) {
-    const layer = document.getElementById('characters-layer');
-    if (!layer) return;
-    CHARS.forEach(char => {
-      const el = elements[char.id];
-      if (!el) return;
-      const rect = el.wrap.getBoundingClientRect();
-      if (e.clientX >= rect.left && e.clientX <= rect.right &&
-          e.clientY >= rect.top && e.clientY <= rect.bottom) {
-        // Clicked on character!
-        doJump(char);
-        const q = char.quotes[Math.floor(Math.random() * char.quotes.length)];
-        showBubble(char, q);
-        spawnExplosion(e.clientX, e.clientY, char.auraColor);
-      }
-    });
-  });
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
-  }
-})();
 """
 
 LOGIN_HTML = """<!DOCTYPE html>
@@ -1197,10 +719,9 @@ LOGIN_HTML = """<!DOCTYPE html>
 <script>
 function togglePw(i,e){const inp=document.getElementById(i),eye=document.getElementById(e);inp.type=inp.type==='password'?'text':'password';eye.textContent=inp.type==='password'?'👁':'🙈'}
 function spawnKi(x,y){const p=document.createElement('div');p.className='ki-particle';const s=10+Math.random()*15;p.style.cssText=`left:${x-s/2}px;top:${y-s/2}px;width:${s}px;height:${s}px`;document.body.appendChild(p);setTimeout(()=>p.remove(),600)}
-document.addEventListener('click',e=>{spawnKi(e.clientX,e.clientY);for(let i=0;i<2;i++)setTimeout(()=>spawnKi(e.clientX+(Math.random()-.5)*30,e.clientY+(Math.random()-.5)*30),i*80)});
+document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('#characters-layer'))return;spawnKi(e.clientX,e.clientY);for(let i=0;i<2;i++)setTimeout(()=>spawnKi(e.clientX+(Math.random()-.5)*30,e.clientY+(Math.random()-.5)*30),i*80)});
 async function login(){
-  const team=document.getElementById('team').value.trim();
-  const password=document.getElementById('password').value;
+  const team=document.getElementById('team').value.trim(),password=document.getElementById('password').value;
   document.querySelectorAll('.alert').forEach(m=>m.remove());
   if(!team||!password)return showAlert('⚠ Fill in all fields, warrior!','error');
   const btn=document.getElementById('login-btn');
@@ -1213,10 +734,7 @@ async function login(){
       showAlert('🐉 POWER LEVEL MAXIMUM! Entering battle...','success');
       for(let i=0;i<10;i++)setTimeout(()=>spawnKi(Math.random()*window.innerWidth,Math.random()*window.innerHeight),i*80);
       setTimeout(()=>window.location.href=data.is_admin?'/admin':'/',1000);
-    }else{
-      showAlert('💀 '+(data.message||'Login failed'),'error');
-      btn.textContent='⚡ POWER UP & LOGIN';btn.disabled=false;btn.classList.remove('ki-charging');
-    }
+    }else{showAlert('💀 '+(data.message||'Login failed'),'error');btn.textContent='⚡ POWER UP & LOGIN';btn.disabled=false;btn.classList.remove('ki-charging')}
   }catch(e){showAlert('⚠ Network error','error');btn.textContent='⚡ POWER UP & LOGIN';btn.disabled=false;btn.classList.remove('ki-charging')}
 }
 function showAlert(msg,type){document.querySelector('.card').insertAdjacentHTML('afterbegin',`<div class="alert alert-${type}">${msg}</div>`)}
@@ -1263,7 +781,7 @@ REGISTER_HTML = """<!DOCTYPE html>
 <script>
 function togglePw(i,e){const inp=document.getElementById(i),eye=document.getElementById(e);inp.type=inp.type==='password'?'text':'password';eye.textContent=inp.type==='password'?'👁':'🙈'}
 function spawnKi(x,y){const p=document.createElement('div');p.className='ki-particle';const s=10+Math.random()*15;p.style.cssText=`left:${x-s/2}px;top:${y-s/2}px;width:${s}px;height:${s}px`;document.body.appendChild(p);setTimeout(()=>p.remove(),600)}
-document.addEventListener('click',e=>{spawnKi(e.clientX,e.clientY)});
+document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('#characters-layer'))return;spawnKi(e.clientX,e.clientY)});
 async function register(){
   const name=document.getElementById('name').value.trim(),email=document.getElementById('email').value.trim(),password=document.getElementById('password').value,confirm=document.getElementById('confirm').value,country=document.getElementById('country').value.trim();
   document.querySelectorAll('.alert').forEach(m=>m.remove());
@@ -1398,7 +916,6 @@ INDEX_HTML = """<!DOCTYPE html>
   <span style="top:40%;width:50%;left:25%;animation-delay:1.5s;animation-duration:4s"></span>
   <span style="top:70%;width:70%;left:15%;animation-delay:3s;animation-duration:6s"></span>
 </div>
-
 <header class="header">
   <a class="logo" href="/">{{ ctf_name }}<span> CTF</span></a>
   <nav>
@@ -1490,7 +1007,7 @@ const token=localStorage.getItem('ctf_token'),team=localStorage.getItem('ctf_tea
 if(token&&team){document.getElementById('user-bar').style.display='flex';document.getElementById('user-name').textContent='⚡ '+team;document.getElementById('auth-links').style.display='none';if(isAdmin)document.getElementById('admin-link').style.display='inline-block'}
 
 function spawnKi(x,y){const p=document.createElement('div');p.className='ki-particle';const s=10+Math.random()*15;p.style.cssText=`left:${x-s/2}px;top:${y-s/2}px;width:${s}px;height:${s}px`;document.body.appendChild(p);setTimeout(()=>p.remove(),600)}
-document.addEventListener('click',e=>{spawnKi(e.clientX,e.clientY);for(let i=0;i<2;i++)setTimeout(()=>spawnKi(e.clientX+(Math.random()-.5)*30,e.clientY+(Math.random()-.5)*30),i*80)});
+document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('#characters-layer'))return;spawnKi(e.clientX,e.clientY);for(let i=0;i<2;i++)setTimeout(()=>spawnKi(e.clientX+(Math.random()-.5)*30,e.clientY+(Math.random()-.5)*30),i*80)});
 
 function animatePowerCounter(target){const el=document.getElementById('power-counter');if(!target){el.textContent='SCOUTING...';return}let c=0;const step=Math.ceil(target/60);const iv=setInterval(()=>{c=Math.min(c+step,target);el.textContent=c.toLocaleString();if(c>=target)clearInterval(iv)},16)}
 
@@ -1951,7 +1468,7 @@ def create_app(config: Config = None) -> Flask:
     return app
 
 
-# ── Entry point ────────────────────────────────────────────────────────
+# ── Entry point ──────────────────────────────────────────────────────
 app = create_app()
 
 if __name__ == "__main__":
