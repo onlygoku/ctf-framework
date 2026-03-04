@@ -1,5 +1,5 @@
 """
-Web App - CTF Platform - Dragon Ball Z Theme with Real Character Images
+Web App - CTF Platform - Dragon Ball Z Theme with Intro Animation
 """
 
 import sys
@@ -17,6 +17,756 @@ from ctf_core.challenge_manager import ChallengeManager
 from ctf_core.flag_validator import FlagValidator
 from ctf_core.scoreboard import Scoreboard
 from ctf_core.auth import AuthManager
+
+# ─────────────────────────────────────────────────────────────────────
+# DBZ INTRO SEQUENCE
+# ─────────────────────────────────────────────────────────────────────
+DBZ_INTRO = """
+<div id="dbz-intro" style="
+  position:fixed;inset:0;z-index:99999;
+  background:#000;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  overflow:hidden;font-family:'Bangers',cursive;
+">
+
+  <!-- ── SKIP BUTTON ── -->
+  <button id="skip-btn" onclick="skipIntro()" style="
+    position:absolute;top:20px;right:20px;
+    background:transparent;border:1px solid rgba(255,106,0,.5);
+    color:rgba(255,106,0,.7);font-family:'Bangers',cursive;
+    font-size:.85rem;letter-spacing:.15em;padding:6px 14px;
+    cursor:pointer;border-radius:2px;z-index:10;
+    transition:all .2s;
+  " onmouseover="this.style.borderColor='#ff6a00';this.style.color='#ffd700'"
+     onmouseout="this.style.borderColor='rgba(255,106,0,.5)';this.style.color='rgba(255,106,0,.7)'">
+    SKIP ▶
+  </button>
+
+  <!-- ── PHASE 1: BLACK SCREEN FLASH ── -->
+  <div id="intro-flash" style="
+    position:absolute;inset:0;background:#fff;
+    opacity:0;pointer-events:none;
+    transition:opacity .08s;
+  "></div>
+
+  <!-- ── PHASE 2: ENERGY CHARGE SCREEN ── -->
+  <div id="intro-charge" style="
+    position:absolute;inset:0;opacity:0;
+    display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(ellipse at center,#1a0800 0%,#000 70%);
+  ">
+    <!-- Ground shockwave rings -->
+    <div id="shock1" style="
+      position:absolute;bottom:0;left:50%;transform:translateX(-50%);
+      width:0;height:0;border-radius:50%;
+      border:3px solid #ff6a00;opacity:0;
+    "></div>
+    <div id="shock2" style="
+      position:absolute;bottom:0;left:50%;transform:translateX(-50%);
+      width:0;height:0;border-radius:50%;
+      border:2px solid #ffd700;opacity:0;
+    "></div>
+    <div id="shock3" style="
+      position:absolute;bottom:0;left:50%;transform:translateX(-50%);
+      width:0;height:0;border-radius:50%;
+      border:2px solid #fff;opacity:0;
+    "></div>
+
+    <!-- Aura column -->
+    <div id="aura-column" style="
+      position:absolute;bottom:0;left:50%;transform:translateX(-50%);
+      width:80px;height:0;
+      background:linear-gradient(0deg,#ffd700,#ff6a00,transparent);
+      filter:blur(12px);opacity:0;
+      border-radius:50% 50% 0 0;
+    "></div>
+
+    <!-- Lightning bolts -->
+    <canvas id="lightning-canvas" style="
+      position:absolute;inset:0;width:100%;height:100%;
+      pointer-events:none;opacity:0;
+    "></canvas>
+
+    <!-- Power Level Counter -->
+    <div id="power-counter-intro" style="
+      position:absolute;top:30px;right:30px;
+      background:rgba(0,0,0,.8);border:2px solid #ff6a00;
+      padding:8px 16px;border-radius:4px;
+      box-shadow:0 0 20px rgba(255,106,0,.5);
+    ">
+      <div style="font-size:.6rem;color:#c8a878;letter-spacing:.3em;margin-bottom:2px">POWER LEVEL</div>
+      <div id="pl-number" style="font-size:1.8rem;color:#ffd700;letter-spacing:.05em">000000</div>
+    </div>
+
+    <!-- Scouter beep text -->
+    <div id="scouter-text" style="
+      position:absolute;top:30px;left:30px;
+      color:#00ff44;font-size:.75rem;
+      letter-spacing:.2em;opacity:0;
+      font-family:'Share Tech Mono',monospace;
+    ">SCANNING...</div>
+
+    <!-- Central character silhouette -->
+    <div id="char-silhouette" style="
+      position:absolute;bottom:60px;left:50%;transform:translateX(-50%);
+      width:120px;height:220px;
+      background:linear-gradient(180deg,#ffd700,#ff6a00);
+      clip-path:polygon(30% 0%,70% 0%,85% 15%,90% 30%,85% 50%,80% 65%,90% 80%,85% 100%,15% 100%,10% 80%,20% 65%,15% 50%,10% 30%,15% 15%);
+      opacity:0;filter:blur(2px);
+      box-shadow:0 0 40px #ffd700,0 0 80px #ff6a00;
+    "></div>
+
+    <!-- Aura spikes around silhouette -->
+    <div id="aura-spikes" style="
+      position:absolute;bottom:55px;left:50%;transform:translateX(-50%);
+      width:300px;height:300px;opacity:0;
+    ">
+      <svg viewBox="0 0 300 300" style="width:100%;height:100%">
+        <polygon points="150,10 130,80 150,60 170,80" fill="#ffd700" opacity="0.8"/>
+        <polygon points="260,60 200,110 220,100 195,140" fill="#ff6a00" opacity="0.7"/>
+        <polygon points="290,150 220,150 240,130 220,170" fill="#ffd700" opacity="0.6"/>
+        <polygon points="260,240 200,190 220,200 195,160" fill="#ff6a00" opacity="0.7"/>
+        <polygon points="40,60 100,110 80,100 105,140" fill="#ff6a00" opacity="0.7"/>
+        <polygon points="10,150 80,150 60,130 80,170" fill="#ffd700" opacity="0.6"/>
+        <polygon points="40,240 100,190 80,200 105,160" fill="#ff6a00" opacity="0.7"/>
+      </svg>
+    </div>
+
+    <!-- AAAAAHHH scream text -->
+    <div id="scream-text" style="
+      position:absolute;top:50%;left:50%;
+      transform:translate(-50%,-50%);
+      font-size:clamp(3rem,10vw,7rem);
+      letter-spacing:.1em;
+      opacity:0;white-space:nowrap;
+      background:linear-gradient(135deg,#fff,#ffd700,#ff6a00);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+      filter:drop-shadow(0 0 30px #ffd700);
+      text-align:center;
+    ">AAAAHHHHH!!!</div>
+  </div>
+
+  <!-- ── PHASE 3: TITLE CARD ── -->
+  <div id="intro-title" style="
+    position:absolute;inset:0;opacity:0;
+    display:flex;flex-direction:column;
+    align-items:center;justify-content:center;
+    background:radial-gradient(ellipse at center,#0d0400 0%,#000 80%);
+  ">
+    <!-- Speed lines -->
+    <canvas id="speed-canvas" style="
+      position:absolute;inset:0;width:100%;height:100%;
+      pointer-events:none;
+    "></canvas>
+
+    <!-- Dragon silhouette -->
+    <div style="
+      position:absolute;top:0;left:0;right:0;bottom:0;
+      background:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 100%22><path d=%22M0 50 Q50 10 100 50 Q150 90 200 50%22 stroke=%22%23ff6a0022%22 stroke-width=%222%22 fill=%22none%22/></svg>') center/cover;
+      opacity:0.3;pointer-events:none;
+    "></div>
+
+    <!-- Dragon balls row -->
+    <div id="dballs-intro" style="
+      display:flex;gap:16px;margin-bottom:24px;opacity:0;
+    ">
+      <div class="dball-big" style="animation-delay:0s"></div>
+      <div class="dball-big" style="animation-delay:.1s"></div>
+      <div class="dball-big" style="animation-delay:.2s"></div>
+      <div class="dball-big" style="animation-delay:.3s"></div>
+      <div class="dball-big" style="animation-delay:.4s"></div>
+      <div class="dball-big" style="animation-delay:.5s"></div>
+      <div class="dball-big" style="animation-delay:.6s"></div>
+    </div>
+
+    <!-- Main title -->
+    <div id="main-title-intro" style="
+      font-size:clamp(3rem,12vw,8rem);
+      letter-spacing:.08em;line-height:.9;
+      text-align:center;
+      opacity:0;transform:scale(3);
+      background:linear-gradient(135deg,#fff 0%,#ffd700 30%,#ff6a00 60%,#ff1a1a 100%);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+      filter:drop-shadow(0 0 30px #ff6a0088);
+    " id="title-text-intro">LOADING...</div>
+
+    <!-- Subtitle -->
+    <div id="sub-title-intro" style="
+      font-size:clamp(.8rem,2vw,1.2rem);
+      letter-spacing:.4em;color:#ff6a00;
+      margin-top:16px;opacity:0;
+      text-transform:uppercase;
+    ">⚡ CAPTURE THE FLAG ⚡</div>
+
+    <!-- Power level bar -->
+    <div id="pl-bar-wrap" style="
+      margin-top:32px;width:min(400px,80vw);opacity:0;
+    ">
+      <div style="font-size:.65rem;color:#c8a878;letter-spacing:.3em;margin-bottom:6px;text-align:center">LOADING BATTLE DATA</div>
+      <div style="background:rgba(255,106,0,.15);border:1px solid rgba(255,106,0,.4);border-radius:2px;overflow:hidden;height:8px">
+        <div id="pl-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#ff6a00,#ffd700);transition:width .05s linear;box-shadow:0 0 10px #ffd700"></div>
+      </div>
+    </div>
+
+    <!-- ENTER button -->
+    <button id="enter-btn" onclick="skipIntro()" style="
+      display:none;margin-top:32px;
+      padding:14px 48px;
+      font-family:'Bangers',cursive;font-size:1.4rem;letter-spacing:.2em;
+      border:2px solid #ffd700;
+      background:linear-gradient(135deg,rgba(255,215,0,.2),rgba(255,106,0,.1));
+      color:#ffd700;cursor:pointer;border-radius:2px;
+      box-shadow:0 0 20px rgba(255,215,0,.3),0 0 40px rgba(255,106,0,.2);
+      animation:enterpulse 1.5s ease-in-out infinite;
+    ">⚡ ENTER THE BATTLE ⚡</button>
+  </div>
+
+  <!-- ── PHASE 4: CHARACTERS PARADE ── -->
+  <div id="intro-chars" style="
+    position:absolute;inset:0;opacity:0;
+    background:#000;overflow:hidden;
+  ">
+    <!-- Character spotlight -->
+    <div id="char-spotlight" style="
+      position:absolute;top:0;left:50%;transform:translateX(-50%);
+      width:300px;height:100%;
+      background:radial-gradient(ellipse at 50% 0%,rgba(255,215,0,.15) 0%,transparent 70%);
+      pointer-events:none;
+    "></div>
+
+    <!-- Speed lines bg -->
+    <canvas id="parade-canvas" style="position:absolute;inset:0;width:100%;height:100%"></canvas>
+
+    <!-- Character display -->
+    <div id="parade-char" style="
+      position:absolute;bottom:0;left:50%;transform:translateX(-50%);
+      text-align:center;
+    ">
+      <img id="parade-img" src="" alt="" style="
+        height:min(65vh,380px);width:auto;
+        display:block;margin:0 auto;
+        filter:drop-shadow(0 0 30px #ffd700) drop-shadow(0 0 60px #ff6a00);
+        transform:scale(0);transition:transform .4s cubic-bezier(.34,1.56,.64,1);
+      "/>
+      <div id="parade-name" style="
+        font-size:clamp(2rem,6vw,4rem);letter-spacing:.15em;
+        color:#ffd700;margin-top:8px;
+        text-shadow:0 0 20px #ffd700,0 0 40px #ff6a00;
+        opacity:0;transform:translateY(20px);transition:all .4s ease;
+      "></div>
+      <div id="parade-quote" style="
+        font-size:clamp(.9rem,2vw,1.3rem);letter-spacing:.1em;
+        color:#ff6a00;margin-top:4px;
+        opacity:0;transform:translateY(10px);transition:all .3s ease .15s;
+      "></div>
+    </div>
+
+    <!-- Vs flash -->
+    <div id="vs-flash" style="
+      position:absolute;inset:0;
+      background:radial-gradient(ellipse at center,rgba(255,255,255,.95),rgba(255,215,0,.8),transparent 60%);
+      opacity:0;pointer-events:none;
+    "></div>
+
+    <!-- Aura ring at feet -->
+    <div id="parade-aura" style="
+      position:absolute;bottom:30px;left:50%;transform:translateX(-50%);
+      width:200px;height:40px;border-radius:50%;
+      background:transparent;
+      box-shadow:0 0 0 0 transparent;
+      pointer-events:none;
+    "></div>
+  </div>
+
+</div>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bangers&family=Rajdhani:wght@400;700&family=Share+Tech+Mono&display=swap');
+@keyframes enterpulse{0%,100%{box-shadow:0 0 20px rgba(255,215,0,.3),0 0 40px rgba(255,106,0,.2)}50%{box-shadow:0 0 40px rgba(255,215,0,.6),0 0 80px rgba(255,106,0,.4)}}
+@keyframes dball-drop{0%{transform:translateY(-40px) scale(0);opacity:0}60%{transform:translateY(5px) scale(1.1)}100%{transform:translateY(0) scale(1);opacity:1}}
+@keyframes dball-glow{0%,100%{box-shadow:0 0 10px rgba(255,215,0,.5)}50%{box-shadow:0 0 25px rgba(255,215,0,.9),0 0 50px rgba(255,106,0,.5)}}
+.dball-big{
+  width:32px;height:32px;border-radius:50%;
+  background:radial-gradient(circle at 35% 35%,#fff8e0,#ffd700 40%,#ff6a00 80%,#8b4500);
+  box-shadow:0 0 10px rgba(255,215,0,.5);
+  animation:dball-glow 2s ease-in-out infinite;
+}
+</style>
+
+<script>
+(function(){
+  // ── Only play intro once per session ──
+  if (sessionStorage.getItem('dbz_intro_done')) {
+    document.getElementById('dbz-intro').style.display = 'none';
+    return;
+  }
+
+  const CHAR_DATA = [
+    {
+      name: 'GOKU',
+      img: 'https://www.pngmart.com/files/22/Goku-SSJ-PNG-Isolated-Photo.png',
+      fallback: 'https://static.wikia.nocookie.net/dragonball/images/5/5b/Goku_SSJ_Namek_Saga.png',
+      quote: '"KAMEHAMEHA!!"',
+      aura: '#ffd700',
+    },
+    {
+      name: 'VEGETA',
+      img: 'https://www.pngmart.com/files/22/Vegeta-PNG-Isolated-Cutout.png',
+      fallback: 'https://static.wikia.nocookie.net/dragonball/images/8/8b/VegetavsGokuEp.png',
+      quote: '"OVER 9000!!"',
+      aura: '#8800ff',
+    },
+    {
+      name: 'PICCOLO',
+      img: 'https://www.pngmart.com/files/22/Piccolo-PNG-Free-Download.png',
+      fallback: 'https://static.wikia.nocookie.net/dragonball/images/3/33/PiccoloNV.png',
+      quote: '"SPECIAL BEAM CANNON!!"',
+      aura: '#00aa44',
+    },
+    {
+      name: 'GOHAN',
+      img: 'https://www.pngmart.com/files/22/Gohan-PNG-Free-Download.png',
+      fallback: 'https://static.wikia.nocookie.net/dragonball/images/5/5b/GohanSSJ2Cell.png',
+      quote: '"THIS POWER...!"',
+      aura: '#ffd700',
+    },
+    {
+      name: 'FRIEZA',
+      img: 'https://www.pngmart.com/files/22/Frieza-PNG-File.png',
+      fallback: 'https://static.wikia.nocookie.net/dragonball/images/6/6c/FriezaFinalForm.png',
+      quote: '"KNEEL BEFORE ME!!"',
+      aura: '#cc44ff',
+    },
+  ];
+
+  let introRunning = true;
+
+  window.skipIntro = function() {
+    introRunning = false;
+    const intro = document.getElementById('dbz-intro');
+    intro.style.transition = 'opacity .5s';
+    intro.style.opacity = '0';
+    setTimeout(() => {
+      intro.style.display = 'none';
+      sessionStorage.setItem('dbz_intro_done', '1');
+    }, 500);
+  };
+
+  // ── LIGHTNING CANVAS ──
+  function drawLightning(canvas, color, intensity) {
+    const ctx = canvas.getContext('2d');
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const cx = canvas.width / 2;
+    const cy = canvas.height * 0.6;
+    for (let i = 0; i < intensity; i++) {
+      ctx.beginPath();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = Math.random() * 2 + 0.5;
+      ctx.globalAlpha = Math.random() * 0.8 + 0.2;
+      let x = cx + (Math.random() - 0.5) * 200;
+      let y = cy + (Math.random() - 0.5) * 200;
+      ctx.moveTo(x, y);
+      for (let j = 0; j < 6; j++) {
+        x += (Math.random() - 0.5) * 120;
+        y += (Math.random() - 0.5) * 120;
+        ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ── SPEED LINES CANVAS ──
+  function drawSpeedLines(canvas, alpha) {
+    const ctx = canvas.getContext('2d');
+    canvas.width = canvas.offsetWidth || window.innerWidth;
+    canvas.height = canvas.offsetHeight || window.innerHeight;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const cx = canvas.width / 2, cy = canvas.height / 2;
+    ctx.globalAlpha = alpha;
+    for (let i = 0; i < 80; i++) {
+      const angle = (i / 80) * Math.PI * 2;
+      const inner = 60 + Math.random() * 40;
+      const outer = Math.max(canvas.width, canvas.height);
+      const width = Math.random() * 3 + 0.5;
+      ctx.beginPath();
+      ctx.strokeStyle = i % 3 === 0 ? '#ffd700' : i % 3 === 1 ? '#ff6a00' : '#fff';
+      ctx.lineWidth = width;
+      ctx.moveTo(cx + Math.cos(angle) * inner, cy + Math.sin(angle) * inner);
+      ctx.lineTo(cx + Math.cos(angle) * outer, cy + Math.sin(angle) * outer);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ── POWER LEVEL COUNTER ──
+  function animatePL(el, target, duration) {
+    let start = null, current = 0;
+    function step(ts) {
+      if (!start) start = ts;
+      const p = Math.min(1, (ts - start) / duration);
+      current = Math.floor(p * target);
+      el.textContent = String(current).padStart(6, '0');
+      if (p < 1 && introRunning) requestAnimationFrame(step);
+      else el.textContent = String(target).padStart(6, '0');
+    }
+    requestAnimationFrame(step);
+  }
+
+  // ── PULSE ELEMENT ──
+  function pulse(el, prop, from, to, duration, cb) {
+    const start = performance.now();
+    function frame(now) {
+      const p = Math.min(1, (now - start) / duration);
+      el.style[prop] = from + (to - from) * p;
+      if (p < 1) requestAnimationFrame(frame);
+      else if (cb) cb();
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // ── SHOCKWAVE ──
+  function animateShockwave(el, delay, size, color) {
+    setTimeout(() => {
+      el.style.transition = 'none';
+      el.style.width = '0px'; el.style.height = '0px';
+      el.style.borderColor = color;
+      el.style.opacity = '1';
+      el.style.marginLeft = '0'; el.style.marginBottom = '0';
+      requestAnimationFrame(() => {
+        el.style.transition = `all ${700}ms ease-out`;
+        el.style.width = size + 'px';
+        el.style.height = size * 0.35 + 'px';
+        el.style.marginLeft = -(size/2) + 'px';
+        el.style.marginBottom = -(size*0.35/2) + 'px';
+        el.style.opacity = '0';
+      });
+    }, delay);
+  }
+
+  // ── PARADE CANVAS SPEED LINES ──
+  let paradeFrame = null;
+  function startParadeLines(canvas, color) {
+    let t = 0;
+    function draw() {
+      if (!introRunning) return;
+      const ctx = canvas.getContext('2d');
+      canvas.width = canvas.offsetWidth || window.innerWidth;
+      canvas.height = canvas.offsetHeight || window.innerHeight;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const cx = canvas.width / 2;
+      for (let i = 0; i < 60; i++) {
+        const angle = (i / 60) * Math.PI * 2 + t;
+        const inner = 80;
+        const outer = 600 + Math.sin(t * 3 + i) * 100;
+        ctx.beginPath();
+        ctx.strokeStyle = i % 2 === 0 ? color : '#ffffff22';
+        ctx.lineWidth = Math.random() * 2 + 0.5;
+        ctx.globalAlpha = 0.3 + Math.sin(t * 2 + i) * 0.15;
+        ctx.moveTo(cx + Math.cos(angle) * inner, canvas.height * 0.3 + Math.sin(angle) * inner * 0.3);
+        ctx.lineTo(cx + Math.cos(angle) * outer, canvas.height * 0.3 + Math.sin(angle) * outer * 0.3);
+        ctx.stroke();
+      }
+      t += 0.04;
+      paradeFrame = requestAnimationFrame(draw);
+    }
+    draw();
+  }
+
+  // ── SHOW CHARACTER IN PARADE ──
+  function showParadeChar(charData, callback) {
+    if (!introRunning) return;
+    const img = document.getElementById('parade-img');
+    const name = document.getElementById('parade-name');
+    const quote = document.getElementById('parade-quote');
+    const aura = document.getElementById('parade-aura');
+    const spotlight = document.getElementById('char-spotlight');
+    const vsFlash = document.getElementById('vs-flash');
+
+    // Reset
+    img.style.transform = 'scale(0)';
+    name.style.opacity = '0';
+    name.style.transform = 'translateY(20px)';
+    quote.style.opacity = '0';
+    quote.style.transform = 'translateY(10px)';
+
+    // Set content
+    img.src = charData.img;
+    img.onerror = function(){ this.src = charData.fallback; this.onerror=null; };
+    name.textContent = charData.name;
+    quote.textContent = charData.quote;
+    spotlight.style.background = `radial-gradient(ellipse at 50% 0%,${charData.aura}22 0%,transparent 70%)`;
+    aura.style.background = charData.aura;
+    aura.style.boxShadow = `0 0 40px ${charData.aura}, 0 0 80px ${charData.aura}55`;
+    aura.style.filter = `blur(12px)`;
+    aura.style.opacity = '0.7';
+
+    // Update parade canvas color
+    if (paradeFrame) cancelAnimationFrame(paradeFrame);
+    startParadeLines(document.getElementById('parade-canvas'), charData.aura + '44');
+
+    // Animate in
+    setTimeout(() => {
+      img.style.transform = 'scale(1)';
+      setTimeout(() => {
+        name.style.opacity = '1';
+        name.style.transform = 'translateY(0)';
+        name.style.color = charData.aura;
+        name.style.textShadow = `0 0 20px ${charData.aura}, 0 0 40px ${charData.aura}88`;
+        setTimeout(() => {
+          quote.style.opacity = '1';
+          quote.style.transform = 'translateY(0)';
+          // Flash
+          vsFlash.style.transition = 'opacity .1s';
+          vsFlash.style.opacity = '0.6';
+          vsFlash.style.background = `radial-gradient(ellipse at center,rgba(255,255,255,.9),${charData.aura}88,transparent 60%)`;
+          setTimeout(() => {
+            vsFlash.style.transition = 'opacity .4s';
+            vsFlash.style.opacity = '0';
+            setTimeout(callback, 1400);
+          }, 80);
+        }, 300);
+      }, 200);
+    }, 100);
+  }
+
+  // ────────────────────────────────────────────────
+  // MAIN INTRO SEQUENCE
+  // ────────────────────────────────────────────────
+  async function runIntro() {
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+    // ── PHASE 0: Initial black with white flash ──
+    if (!introRunning) return;
+    const flash = document.getElementById('intro-flash');
+    await sleep(200);
+    flash.style.opacity = '1';
+    await sleep(80);
+    flash.style.opacity = '0';
+    await sleep(100);
+    flash.style.opacity = '1';
+    await sleep(60);
+    flash.style.opacity = '0';
+
+    // ── PHASE 1: ENERGY CHARGE ──
+    if (!introRunning) return;
+    const charge = document.getElementById('intro-charge');
+    charge.style.transition = 'opacity .3s';
+    charge.style.opacity = '1';
+
+    const scouterText = document.getElementById('scouter-text');
+    scouterText.style.transition = 'opacity .3s';
+    scouterText.style.opacity = '1';
+
+    // Animate power level counter
+    const plEl = document.getElementById('pl-number');
+    animatePL(plEl, 530000, 2500);
+
+    // Aura column rises
+    const auraCol = document.getElementById('aura-column');
+    auraCol.style.transition = 'height 2s ease-out, opacity .3s';
+    auraCol.style.opacity = '1';
+    await sleep(100);
+    auraCol.style.height = '70vh';
+
+    // Shockwaves
+    await sleep(300);
+    animateShockwave(document.getElementById('shock1'), 0, 600, '#ff6a00');
+    animateShockwave(document.getElementById('shock2'), 150, 800, '#ffd700');
+    animateShockwave(document.getElementById('shock3'), 300, 1000, '#ffffff88');
+
+    // Silhouette appears
+    await sleep(500);
+    const sil = document.getElementById('char-silhouette');
+    sil.style.transition = 'opacity .4s, filter .4s';
+    sil.style.opacity = '1';
+    sil.style.filter = 'blur(0px)';
+
+    // Aura spikes
+    const spikes = document.getElementById('aura-spikes');
+    spikes.style.transition = 'opacity .3s';
+    spikes.style.opacity = '1';
+
+    // Lightning
+    await sleep(400);
+    const lCanvas = document.getElementById('lightning-canvas');
+    lCanvas.style.transition = 'opacity .2s';
+    lCanvas.style.opacity = '1';
+    let lCount = 0;
+    const lInterval = setInterval(() => {
+      if (!introRunning) { clearInterval(lInterval); return; }
+      drawLightning(lCanvas, lCount % 2 === 0 ? '#ffd700' : '#ffffff', 8);
+      lCount++;
+      if (lCount > 20) clearInterval(lInterval);
+    }, 100);
+
+    // Scream text
+    await sleep(600);
+    if (!introRunning) return;
+    const scream = document.getElementById('scream-text');
+    scream.style.transition = 'opacity .15s, transform .15s';
+    scream.style.opacity = '1';
+    scream.style.transform = 'translate(-50%,-50%) scale(1)';
+    await sleep(200);
+    scream.style.transform = 'translate(-50%,-50%) scale(1.15)';
+    await sleep(200);
+    scream.style.transform = 'translate(-50%,-50%) scale(0.95)';
+
+    // Scouter broken
+    await sleep(400);
+    scouterText.textContent = 'IT\'S OVER 9000!!';
+    scouterText.style.color = '#ff0000';
+    scouterText.style.fontSize = '1rem';
+
+    await sleep(800);
+    if (!introRunning) return;
+
+    // Flash out of charge phase
+    flash.style.opacity = '1';
+    await sleep(80);
+    charge.style.opacity = '0';
+    flash.style.opacity = '0';
+
+    // ── PHASE 2: TITLE CARD ──
+    if (!introRunning) return;
+    const titlePhase = document.getElementById('intro-title');
+    titlePhase.style.transition = 'opacity .4s';
+    titlePhase.style.opacity = '1';
+
+    // Speed lines
+    const speedCanvas = document.getElementById('speed-canvas');
+    let speedAlpha = 0;
+    const speedInterval = setInterval(() => {
+      if (!introRunning) { clearInterval(speedInterval); return; }
+      speedAlpha = Math.min(0.4, speedAlpha + 0.02);
+      drawSpeedLines(speedCanvas, speedAlpha);
+    }, 30);
+
+    // Dragon balls drop in
+    await sleep(200);
+    if (!introRunning) return;
+    const dballs = document.getElementById('dballs-intro');
+    dballs.style.transition = 'opacity .2s';
+    dballs.style.opacity = '1';
+    const dballEls = dballs.querySelectorAll('.dball-big');
+    dballEls.forEach((d, i) => {
+      setTimeout(() => {
+        d.style.animation = `dball-drop .5s cubic-bezier(.34,1.56,.64,1) forwards, dball-glow 2s ease-in-out ${i*.1}s infinite`;
+      }, i * 100);
+    });
+
+    await sleep(600);
+    if (!introRunning) return;
+
+    // Title slams in
+    const titleEl = document.getElementById('main-title-intro');
+    titleEl.textContent = document.title.replace(' - CTF','').replace('CTF','').trim() || 'CTF ARENA';
+    // Slam effect
+    titleEl.style.transition = 'none';
+    titleEl.style.opacity = '0';
+    titleEl.style.transform = 'scale(4)';
+    await sleep(50);
+    titleEl.style.transition = 'all .35s cubic-bezier(.34,1.56,.64,1)';
+    titleEl.style.opacity = '1';
+    titleEl.style.transform = 'scale(1)';
+
+    // Screen shake
+    const intro = document.getElementById('dbz-intro');
+    intro.style.animation = 'none';
+    intro.style.transform = 'translate(-4px, -3px)';
+    await sleep(50);
+    intro.style.transform = 'translate(4px, 3px)';
+    await sleep(50);
+    intro.style.transform = 'translate(-3px, 2px)';
+    await sleep(50);
+    intro.style.transform = 'translate(0,0)';
+
+    // Subtitle
+    await sleep(300);
+    if (!introRunning) return;
+    const sub = document.getElementById('sub-title-intro');
+    sub.style.transition = 'opacity .4s, transform .4s';
+    sub.style.opacity = '1';
+    sub.style.transform = 'translateY(0)';
+
+    // Loading bar
+    await sleep(200);
+    if (!introRunning) return;
+    const plBarWrap = document.getElementById('pl-bar-wrap');
+    plBarWrap.style.transition = 'opacity .3s';
+    plBarWrap.style.opacity = '1';
+    const plBar = document.getElementById('pl-bar');
+    let barPct = 0;
+    const barInterval = setInterval(() => {
+      if (!introRunning) { clearInterval(barInterval); return; }
+      barPct = Math.min(100, barPct + 2);
+      plBar.style.width = barPct + '%';
+      if (barPct >= 100) clearInterval(barInterval);
+    }, 30);
+
+    await sleep(1800);
+    clearInterval(speedInterval);
+    if (!introRunning) return;
+
+    // Flash to characters
+    flash.style.opacity = '1';
+    await sleep(80);
+    titlePhase.style.opacity = '0';
+    flash.style.opacity = '0';
+
+    // ── PHASE 3: CHARACTER PARADE ──
+    if (!introRunning) return;
+    const charsPhase = document.getElementById('intro-chars');
+    charsPhase.style.transition = 'opacity .3s';
+    charsPhase.style.opacity = '1';
+
+    for (let i = 0; i < CHAR_DATA.length; i++) {
+      if (!introRunning) return;
+      await new Promise(resolve => {
+        showParadeChar(CHAR_DATA[i], resolve);
+      });
+      if (!introRunning) return;
+      // Flash between characters
+      if (i < CHAR_DATA.length - 1) {
+        const vsF = document.getElementById('vs-flash');
+        vsF.style.transition = 'opacity .08s';
+        vsF.style.opacity = '1';
+        vsF.style.background = 'rgba(255,255,255,.95)';
+        await sleep(80);
+        vsF.style.transition = 'opacity .3s';
+        vsF.style.opacity = '0';
+      }
+    }
+
+    if (!introRunning) return;
+
+    // Final flash → show enter button
+    flash.style.transition = 'opacity .15s';
+    flash.style.opacity = '1';
+    await sleep(150);
+    charsPhase.style.opacity = '0';
+    flash.style.opacity = '0';
+    titlePhase.style.opacity = '1';
+    titlePhase.style.transition = 'opacity .3s';
+
+    const enterBtn = document.getElementById('enter-btn');
+    enterBtn.style.display = 'block';
+    plBarWrap.style.display = 'none';
+
+    // Auto-enter after 4s if user doesn't click
+    setTimeout(() => {
+      if (introRunning) skipIntro();
+    }, 4000);
+  }
+
+  // Start intro
+  runIntro();
+})();
+</script>
+"""
 
 CHARACTER_JS = """
 (function() {
@@ -98,88 +848,34 @@ CHARACTER_JS = """
   function init() {
     const layer = document.getElementById('characters-layer');
     if (!layer) return;
-
     CHARS.forEach(char => {
       const wrap = document.createElement('div');
       wrap.id = 'char-' + char.id;
-      wrap.style.cssText = `
-        position:absolute;bottom:0;left:${char.x}px;
-        width:${char.width}px;pointer-events:auto;
-        cursor:pointer;z-index:4;transition:filter 0.3s;
-      `;
-
+      wrap.style.cssText = `position:absolute;bottom:0;left:${char.x}px;width:${char.width}px;pointer-events:auto;cursor:pointer;z-index:4;transition:filter 0.3s;`;
       const aura = document.createElement('div');
       aura.id = 'aura-' + char.id;
-      aura.style.cssText = `
-        position:absolute;bottom:-10px;left:50%;
-        transform:translateX(-50%);
-        width:80%;height:30px;
-        background:${char.auraColor};
-        border-radius:50%;
-        filter:blur(14px);
-        opacity:0.55;
-        animation:auraPulse 1.8s ease-in-out infinite alternate;
-        pointer-events:none;z-index:1;
-      `;
+      aura.style.cssText = `position:absolute;bottom:-10px;left:50%;transform:translateX(-50%);width:80%;height:30px;background:${char.auraColor};border-radius:50%;filter:blur(14px);opacity:0.55;animation:auraPulse 1.8s ease-in-out infinite alternate;pointer-events:none;z-index:1;`;
       wrap.appendChild(aura);
-
       const img = document.createElement('img');
       img.src = char.img;
       img.alt = char.name;
       img.crossOrigin = 'anonymous';
-      img.style.cssText = `
-        width:100%;height:auto;display:block;
-        position:relative;z-index:2;
-        filter:drop-shadow(0 0 12px ${char.auraColor}) drop-shadow(0 4px 8px rgba(0,0,0,0.85));
-      `;
-      img.onerror = function() {
-        if (this.src !== FALLBACK_IMGS[char.id]) {
-          this.src = FALLBACK_IMGS[char.id] || '';
-        }
-        this.onerror = null;
-      };
+      img.style.cssText = `width:100%;height:auto;display:block;position:relative;z-index:2;filter:drop-shadow(0 0 12px ${char.auraColor}) drop-shadow(0 4px 8px rgba(0,0,0,0.85));`;
+      img.onerror = function() { if (this.src !== FALLBACK_IMGS[char.id]) { this.src = FALLBACK_IMGS[char.id] || ''; } this.onerror = null; };
       wrap.appendChild(img);
-
       const bubble = document.createElement('div');
       bubble.id = 'bubble-' + char.id;
-      bubble.style.cssText = `
-        position:absolute;bottom:calc(100% + 10px);
-        left:50%;transform:translateX(-50%);
-        background:rgba(8,4,0,0.95);
-        border:2px solid #ff6a00;border-radius:10px;
-        padding:7px 14px;white-space:nowrap;
-        font-family:'Bangers',cursive;font-size:1rem;
-        letter-spacing:0.08em;color:#ffd700;
-        opacity:0;transition:opacity 0.3s;
-        pointer-events:none;z-index:10;
-        box-shadow:0 0 18px rgba(255,106,0,0.5);
-        text-align:center;min-width:90px;
-      `;
+      bubble.style.cssText = `position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%);background:rgba(8,4,0,0.95);border:2px solid #ff6a00;border-radius:10px;padding:7px 14px;white-space:nowrap;font-family:'Bangers',cursive;font-size:1rem;letter-spacing:0.08em;color:#ffd700;opacity:0;transition:opacity 0.3s;pointer-events:none;z-index:10;box-shadow:0 0 18px rgba(255,106,0,0.5);text-align:center;min-width:90px;`;
       const tail = document.createElement('div');
-      tail.style.cssText = `
-        position:absolute;top:100%;left:50%;
-        transform:translateX(-50%);
-        border:7px solid transparent;
-        border-top-color:#ff6a00;
-      `;
+      tail.style.cssText = `position:absolute;top:100%;left:50%;transform:translateX(-50%);border:7px solid transparent;border-top-color:#ff6a00;`;
       bubble.appendChild(tail);
       wrap.appendChild(bubble);
-
       const nameTag = document.createElement('div');
-      nameTag.style.cssText = `
-        text-align:center;
-        font-family:'Bangers',cursive;
-        font-size:0.85rem;letter-spacing:0.15em;
-        color:${char.auraColor};
-        text-shadow:0 0 8px ${char.auraColor};
-        margin-top:2px;position:relative;z-index:2;
-      `;
+      nameTag.style.cssText = `text-align:center;font-family:'Bangers',cursive;font-size:0.85rem;letter-spacing:0.15em;color:${char.auraColor};text-shadow:0 0 8px ${char.auraColor};margin-top:2px;position:relative;z-index:2;`;
       nameTag.textContent = char.name.toUpperCase();
       wrap.appendChild(nameTag);
-
       layer.appendChild(wrap);
       elements[char.id] = { wrap, img, bubble, aura, nameTag };
-
       wrap.addEventListener('click', function(e) {
         e.stopPropagation();
         doJump(char);
@@ -187,7 +883,6 @@ CHARACTER_JS = """
         spawnExplosion(char.x + char.width / 2, window.innerHeight - 80, char.auraColor);
       });
     });
-
     requestAnimationFrame(tick);
     setInterval(randomSpeech, 4000);
     setInterval(randomInteraction, 7000);
@@ -197,61 +892,36 @@ CHARACTER_JS = """
   function tick() {
     frameCount++;
     const W = window.innerWidth;
-
     CHARS.forEach(char => {
       const el = elements[char.id];
       if (!el) return;
-
       char.stateTimer--;
       if (char.stateTimer <= 0) changeState(char);
-
       if (char.isJumping) {
         char.jumpVy += GRAVITY;
         char.y -= char.jumpVy;
         if (char.y <= 0) { char.y = 0; char.isJumping = false; char.jumpVy = 0; }
       }
-
       if (char.state === 'walk')  char.x += char.vx;
       if (char.state === 'run')   char.x += char.vx * 2.8;
       if (char.state === 'fight') char.x += char.vx * 1.4;
-      if (char.state === 'float') {
-        char.x += char.vx * 0.7;
-        char.y = 28 + Math.sin(frameCount * 0.018 + char.x * 0.008) * 22;
-      }
-
-      if (char.x > W - char.width - 10) {
-        char.x = W - char.width - 10;
-        char.vx = -Math.abs(char.vx);
-        char.flipped = true;
-      }
-      if (char.x < 10) {
-        char.x = 10;
-        char.vx = Math.abs(char.vx);
-        char.flipped = false;
-      }
-
+      if (char.state === 'float') { char.x += char.vx * 0.7; char.y = 28 + Math.sin(frameCount * 0.018 + char.x * 0.008) * 22; }
+      if (char.x > W - char.width - 10) { char.x = W - char.width - 10; char.vx = -Math.abs(char.vx); char.flipped = true; }
+      if (char.x < 10) { char.x = 10; char.vx = Math.abs(char.vx); char.flipped = false; }
       el.wrap.style.left = char.x + 'px';
       el.wrap.style.bottom = (char.isJumping || char.state === 'float' ? Math.max(0, char.y) : 0) + 'px';
       el.wrap.style.transform = char.flipped ? 'scaleX(-1)' : 'scaleX(1)';
-
       if (char.state === 'powerup') {
-        el.aura.style.opacity = '0.95';
-        el.aura.style.width = '110%';
-        el.aura.style.height = '50px';
+        el.aura.style.opacity = '0.95'; el.aura.style.width = '110%'; el.aura.style.height = '50px';
         el.wrap.style.filter = `drop-shadow(0 0 25px ${char.auraColor}) drop-shadow(0 0 50px ${char.glowColor}) brightness(1.3)`;
       } else if (char.state === 'fight') {
-        el.aura.style.opacity = '0.75';
-        el.aura.style.width = '90%';
-        el.aura.style.height = '35px';
+        el.aura.style.opacity = '0.75'; el.aura.style.width = '90%'; el.aura.style.height = '35px';
         el.wrap.style.filter = `drop-shadow(0 0 18px ${char.auraColor}) drop-shadow(0 4px 8px rgba(0,0,0,0.8))`;
       } else {
-        el.aura.style.opacity = '0.5';
-        el.aura.style.width = '80%';
-        el.aura.style.height = '28px';
+        el.aura.style.opacity = '0.5'; el.aura.style.width = '80%'; el.aura.style.height = '28px';
         el.wrap.style.filter = `drop-shadow(0 0 12px ${char.auraColor}) drop-shadow(0 4px 8px rgba(0,0,0,0.85))`;
       }
     });
-
     requestAnimationFrame(tick);
   }
 
@@ -266,12 +936,7 @@ CHARACTER_JS = """
     else { char.state='walk'; char.stateTimer=120; }
   }
 
-  function doJump(char) {
-    if (!char.isJumping) {
-      char.isJumping = true;
-      char.jumpVy = -(char.jumpHeight * 0.20);
-    }
-  }
+  function doJump(char) { if (!char.isJumping) { char.isJumping = true; char.jumpVy = -(char.jumpHeight * 0.20); } }
 
   function showBubble(char, text) {
     const el = elements[char.id];
@@ -306,20 +971,9 @@ CHARACTER_JS = """
   function spawnKiBlast(from, to) {
     const blast = document.createElement('div');
     const size = 18 + Math.random() * 14;
-    const startX = from.x + from.width / 2;
-    const startY = window.innerHeight - 120;
-    const endX   = to.x + to.width / 2;
-    const endY   = window.innerHeight - 120;
-    blast.style.cssText = `
-      position:fixed;
-      left:${startX}px;top:${startY}px;
-      width:${size}px;height:${size}px;
-      border-radius:50%;
-      background:radial-gradient(circle,#fff 0%,${from.auraColor} 50%,transparent 100%);
-      box-shadow:0 0 20px ${from.auraColor},0 0 40px ${from.glowColor};
-      pointer-events:none;z-index:6;
-      transform:translate(-50%,-50%);
-    `;
+    const startX = from.x + from.width / 2, startY = window.innerHeight - 120;
+    const endX = to.x + to.width / 2, endY = window.innerHeight - 120;
+    blast.style.cssText = `position:fixed;left:${startX}px;top:${startY}px;width:${size}px;height:${size}px;border-radius:50%;background:radial-gradient(circle,#fff 0%,${from.auraColor} 50%,transparent 100%);box-shadow:0 0 20px ${from.auraColor},0 0 40px ${from.glowColor};pointer-events:none;z-index:6;transform:translate(-50%,-50%);`;
     document.body.appendChild(blast);
     const dx = endX - startX, dy = endY - startY;
     const dist = Math.sqrt(dx*dx + dy*dy);
@@ -329,17 +983,12 @@ CHARACTER_JS = """
       if (!start) start = ts;
       const p = Math.min(1, (ts - start) / dur);
       const arcY = -130 * Math.sin(Math.PI * p);
-      blast.style.left  = (startX + dx * p) + 'px';
-      blast.style.top   = (startY + dy * p + arcY) + 'px';
+      blast.style.left = (startX + dx * p) + 'px';
+      blast.style.top = (startY + dy * p + arcY) + 'px';
       blast.style.opacity = String(1 - p * 0.3);
       blast.style.transform = `translate(-50%,-50%) scale(${1 + p * 0.5})`;
       if (p < 1) { requestAnimationFrame(anim); }
-      else {
-        spawnExplosion(endX, endY, from.auraColor);
-        blast.remove();
-        const toChar = CHARS.find(c => c.id === to.id);
-        if (toChar) showBubble(toChar, toChar.quotes[Math.floor(Math.random() * toChar.quotes.length)]);
-      }
+      else { spawnExplosion(endX, endY, from.auraColor); blast.remove(); const toChar = CHARS.find(c => c.id === to.id); if (toChar) showBubble(toChar, toChar.quotes[Math.floor(Math.random() * toChar.quotes.length)]); }
     }
     requestAnimationFrame(anim);
   }
@@ -348,19 +997,8 @@ CHARACTER_JS = """
     for (let i = 0; i < 7; i++) {
       const exp = document.createElement('div');
       const sz = 24 + Math.random() * 36;
-      const ox = (Math.random() - 0.5) * 60;
-      const oy = (Math.random() - 0.5) * 40;
-      exp.style.cssText = `
-        position:fixed;
-        left:${x + ox - sz/2}px;top:${y + oy - sz/2}px;
-        width:${sz}px;height:${sz}px;
-        border-radius:50%;
-        background:radial-gradient(circle,#fff 0%,${color} 40%,transparent 100%);
-        box-shadow:0 0 30px ${color};
-        pointer-events:none;z-index:7;
-        animation:explodeAnim 0.6s ease-out forwards;
-        animation-delay:${i * 0.04}s;
-      `;
+      const ox = (Math.random() - 0.5) * 60, oy = (Math.random() - 0.5) * 40;
+      exp.style.cssText = `position:fixed;left:${x+ox-sz/2}px;top:${y+oy-sz/2}px;width:${sz}px;height:${sz}px;border-radius:50%;background:radial-gradient(circle,#fff 0%,${color} 40%,transparent 100%);box-shadow:0 0 30px ${color};pointer-events:none;z-index:7;animation:explodeAnim 0.6s ease-out forwards;animation-delay:${i*0.04}s;`;
       document.body.appendChild(exp);
       setTimeout(() => exp.remove(), 700 + i * 45);
     }
@@ -376,16 +1014,11 @@ CHARACTER_JS = """
     if (char.id === 'goku' && char.imgSSJ && !char.isSSJ && Math.random() > 0.35) {
       char.isSSJ = true;
       el.img.src = char.imgSSJ;
-      el.aura.style.background = '#ffd700';
-      el.aura.style.height = '60px';
-      el.aura.style.opacity = '0.9';
+      el.aura.style.background = '#ffd700'; el.aura.style.height = '60px'; el.aura.style.opacity = '0.9';
       el.wrap.style.filter = 'drop-shadow(0 0 30px #ffd700) drop-shadow(0 0 60px #ff6a00) brightness(1.4)';
       setTimeout(() => {
-        char.isSSJ = false;
-        el.img.src = char.img;
-        el.aura.style.background = char.auraColor;
-        el.aura.style.height = '28px';
-        el.aura.style.opacity = '0.5';
+        char.isSSJ = false; el.img.src = char.img;
+        el.aura.style.background = char.auraColor; el.aura.style.height = '28px'; el.aura.style.opacity = '0.5';
       }, 18000);
     }
   }
@@ -404,42 +1037,28 @@ CHARACTER_JS = """
     setTimeout(() => p.remove(), 600);
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    setTimeout(init, 100);
-  }
-
+  if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); }
+  else { setTimeout(init, 100); }
   window.dbzSpawnExplosion = spawnExplosion;
 })();
 """
 
 BASE_STYLE = """
 @import url('https://fonts.googleapis.com/css2?family=Bangers&family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&display=swap');
-:root {
-  --orange:#ff6a00;--yellow:#ffd700;--gold:#ffb300;--red:#ff1a1a;
-  --blue:#00aaff;--white:#fff;--dark:#0a0500;--card:#120800;
-  --border:#ff6a0044;--glow:#ff6a00;--ki:#ffe066;--aura:#ff4400;
-}
+:root{--orange:#ff6a00;--yellow:#ffd700;--gold:#ffb300;--red:#ff1a1a;--blue:#00aaff;--white:#fff;--dark:#0a0500;--card:#120800;--border:#ff6a0044;--glow:#ff6a00;--ki:#ffe066;--aura:#ff4400}
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
 body{background:var(--dark);color:#f5e6c8;font-family:'Rajdhani',sans-serif;min-height:100vh;overflow-x:hidden;cursor:crosshair}
 body::before{content:'';position:fixed;inset:0;z-index:0;background:radial-gradient(ellipse 80% 60% at 50% 0%,#ff6a0022 0%,transparent 70%),radial-gradient(ellipse 40% 40% at 80% 80%,#ffd70011 0%,transparent 60%),linear-gradient(180deg,#0a0500 0%,#0d0300 50%,#080200 100%);pointer-events:none}
 body::after{content:'';position:fixed;inset:0;z-index:0;background-image:radial-gradient(circle 1px at 20% 30%,#ff6a0033 0%,transparent 1px),radial-gradient(circle 1px at 80% 70%,#ffd70022 0%,transparent 1px),radial-gradient(circle 2px at 10% 80%,#ff6a0044 0%,transparent 2px),radial-gradient(circle 1px at 90% 20%,#ffd70033 0%,transparent 1px);animation:stardrift 20s linear infinite;pointer-events:none}
 @keyframes stardrift{0%{transform:translateY(0)}100%{transform:translateY(-100px)}}
-
-/* ── CHARACTERS LAYER ── */
 #characters-layer{position:fixed;inset:0;z-index:4;pointer-events:none;overflow:hidden}
 #characters-layer > div{pointer-events:auto}
 @keyframes auraPulse{0%{opacity:.35;transform:translateX(-50%) scale(.85)}100%{opacity:.75;transform:translateX(-50%) scale(1.15)}}
 @keyframes explodeAnim{0%{transform:scale(0);opacity:1}60%{opacity:.8}100%{transform:scale(4);opacity:0}}
-
-/* ── ENERGY LINES ── */
 .energy-lines{position:fixed;inset:0;z-index:1;pointer-events:none;overflow:hidden}
 .energy-lines span{position:absolute;height:1px;background:linear-gradient(90deg,transparent,#ff6a0055,transparent);animation:energyflow 3s linear infinite;opacity:0}
 @keyframes energyflow{0%{opacity:0;transform:scaleX(0) translateX(-100%)}20%{opacity:1}80%{opacity:1}100%{opacity:0;transform:scaleX(1) translateX(100%)}}
-
-/* ── HEADER ── */
 .header{position:sticky;top:0;z-index:100;padding:1rem 2rem;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(180deg,rgba(10,5,0,.98) 0%,rgba(10,5,0,.9) 100%);border-bottom:2px solid var(--orange);box-shadow:0 2px 30px #ff6a0044,0 0 60px #ff6a0011}
 .header::after{content:'';position:absolute;bottom:-4px;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--yellow),var(--orange),var(--yellow),transparent);animation:headershine 3s linear infinite}
 @keyframes headershine{0%{opacity:.3}50%{opacity:1}100%{opacity:.3}}
@@ -454,8 +1073,6 @@ nav a::after{content:'';position:absolute;bottom:-4px;left:0;right:0;height:2px;
 nav a:hover{color:var(--yellow);text-shadow:0 0 10px #ffd70088}
 nav a:hover::after,nav a.active::after{transform:scaleX(1)}
 nav a.active{color:var(--orange)}
-
-/* ── BUTTONS ── */
 .btn{padding:.75rem 1.75rem;font-family:'Bangers',cursive;font-size:1rem;letter-spacing:.15em;border:2px solid var(--orange);background:linear-gradient(135deg,rgba(255,106,0,.15),rgba(255,50,0,.05));color:var(--yellow);cursor:pointer;border-radius:2px;transition:all .2s;position:relative;overflow:hidden;text-transform:uppercase}
 .btn::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,var(--orange),var(--red));opacity:0;transition:opacity .2s}
 .btn:hover{color:#fff;box-shadow:0 0 20px #ff6a0066;transform:translateY(-2px)}
@@ -468,16 +1085,12 @@ nav a.active{color:var(--orange)}
 .btn-sm{padding:.35rem .8rem;font-size:.8rem}
 .btn-ki{border-color:var(--yellow);background:linear-gradient(135deg,rgba(255,215,0,.2),rgba(255,106,0,.1))}
 .btn-ki:hover{box-shadow:0 0 30px #ffd70088,0 0 60px #ff6a0044;color:#fff}
-
-/* ── LAYOUT ── */
 .container{max-width:480px;margin:4rem auto;padding:0 1rem;position:relative;z-index:10}
 .wide{max-width:1100px;margin:2rem auto;padding:0 1rem;position:relative;z-index:10}
 .card{background:linear-gradient(135deg,rgba(18,8,0,.97),rgba(10,5,0,.99));border:1px solid var(--orange);border-radius:4px;padding:2rem;box-shadow:0 0 40px #ff6a0022,inset 0 0 40px rgba(255,106,0,.03);position:relative;overflow:hidden}
 .card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,var(--orange),var(--yellow),var(--orange),transparent);animation:cardshine 4s linear infinite}
 @keyframes cardshine{0%{opacity:.5}50%{opacity:1}100%{opacity:.5}}
 .card h2{font-family:'Bangers',cursive;font-size:1.8rem;letter-spacing:.2em;color:var(--orange);margin-bottom:1.5rem;text-shadow:0 0 20px #ff6a0066}
-
-/* ── FORMS ── */
 .form-group{margin-bottom:1.2rem}
 .form-group label{display:block;font-size:.75rem;color:#c8a878;letter-spacing:.15em;margin-bottom:.4rem;font-family:'Rajdhani',sans-serif;font-weight:700;text-transform:uppercase}
 .form-group input{width:100%;padding:.75rem 1rem;background:rgba(255,106,0,.05);border:1px solid rgba(255,106,0,.3);color:#f5e6c8;font-family:'Share Tech Mono',monospace;font-size:.9rem;border-radius:2px;outline:none;transition:all .2s}
@@ -487,16 +1100,12 @@ nav a.active{color:var(--orange)}
 .pw-wrap input{padding-right:3rem}
 .pw-toggle{position:absolute;right:.75rem;top:50%;transform:translateY(-50%);background:none;border:none;color:#c8a878;cursor:pointer;font-size:1rem;padding:0;line-height:1;transition:color .2s}
 .pw-toggle:hover{color:var(--yellow)}
-
-/* ── ALERTS ── */
 .alert{padding:.75rem 1rem;border-radius:2px;margin-bottom:1rem;font-size:.9rem;font-weight:600}
 .alert-error{background:rgba(255,26,26,.1);border:1px solid rgba(255,26,26,.4);color:#ff6666}
 .alert-success{background:rgba(255,215,0,.1);border:1px solid rgba(255,215,0,.4);color:var(--yellow)}
 .link{color:var(--orange);text-decoration:none;font-size:.85rem;font-weight:600}
 .link:hover{color:var(--yellow);text-shadow:0 0 8px #ffd70088}
 .text-center{text-align:center;margin-top:1rem}
-
-/* ── TABLES ── */
 table{width:100%;border-collapse:collapse}
 th{text-align:left;padding:.75rem 1rem;font-size:.95rem;letter-spacing:.15em;color:var(--orange);border-bottom:2px solid rgba(255,106,0,.3);font-family:'Bangers',cursive}
 td{padding:.75rem 1rem;border-bottom:1px solid rgba(255,106,0,.1);font-size:.9rem}
@@ -506,23 +1115,17 @@ tr:hover td{background:rgba(255,106,0,.05)}
 .badge-red{background:rgba(255,26,26,.1);color:#ff4444;border:1px solid rgba(255,26,26,.3)}
 .badge-blue{background:rgba(0,170,255,.1);color:var(--blue);border:1px solid rgba(0,170,255,.3)}
 .badge-yellow{background:rgba(255,215,0,.1);color:var(--yellow);border:1px solid rgba(255,215,0,.3)}
-
-/* ── STAT CARDS ── */
 .stat-card{background:linear-gradient(135deg,rgba(18,8,0,.9),rgba(10,5,0,.95));border:1px solid rgba(255,106,0,.3);border-radius:4px;padding:1.5rem;text-align:center;position:relative;overflow:hidden;transition:all .3s;cursor:default}
 .stat-card:hover{border-color:var(--orange);box-shadow:0 0 20px #ff6a0044;transform:translateY(-3px)}
 .stat-value{font-family:'Bangers',cursive;font-size:2.5rem;background:linear-gradient(135deg,var(--yellow),var(--orange));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .stat-label{font-size:.75rem;color:#c8a878;letter-spacing:.15em;margin-top:.25rem;font-weight:700;text-transform:uppercase}
 .section-title{font-family:'Bangers',cursive;font-size:1.5rem;color:var(--orange);letter-spacing:.2em;margin-bottom:1.5rem;padding-bottom:.5rem;border-bottom:2px solid rgba(255,106,0,.3);text-shadow:0 0 15px #ff6a0055}
-
-/* ── TABS ── */
 .tabs{display:flex;margin-bottom:2rem}
 .tab{padding:.75rem 1.5rem;cursor:pointer;border:1px solid rgba(255,106,0,.3);border-right:none;font-family:'Bangers',cursive;font-size:1rem;letter-spacing:.15em;color:#c8a878;transition:all .2s;text-transform:uppercase}
 .tab:last-child{border-right:1px solid rgba(255,106,0,.3)}
 .tab:hover{color:var(--yellow);background:rgba(255,106,0,.1)}
 .tab.active{color:var(--orange);background:rgba(255,106,0,.15);border-color:var(--orange);box-shadow:inset 0 -2px 0 var(--orange)}
 .panel{display:none}.panel.active{display:block}
-
-/* ── HERO ── */
 .hero{text-align:center;padding:4rem 2rem 2rem;position:relative;z-index:10}
 .dragon-radar{position:relative;width:140px;height:140px;margin:0 auto 2rem}
 .radar-circle{position:absolute;inset:0;border-radius:50%;border:2px solid var(--orange);animation:radarping 2s ease-out infinite}
@@ -550,8 +1153,6 @@ tr:hover td{background:rgba(255,106,0,.05)}
 .timer-box::before{left:.5rem}.timer-box::after{right:.5rem}
 .timer-label{font-size:.65rem;color:#c8a878;letter-spacing:.3em;margin-bottom:.25rem;font-weight:700;text-transform:uppercase}
 .timer{font-family:'Bangers',cursive;font-size:2.5rem;color:var(--yellow);letter-spacing:.1em}
-
-/* ── SECTION / CHALLENGES ── */
 .section{padding:2rem;max-width:1200px;margin:0 auto;position:relative;z-index:10}
 .challenges-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem}
 .challenge-card{background:linear-gradient(135deg,rgba(18,8,0,.95),rgba(10,5,0,.98));border:1px solid rgba(255,106,0,.25);border-radius:4px;padding:1.25rem;cursor:pointer;transition:all .25s;position:relative;overflow:hidden}
@@ -571,8 +1172,6 @@ tr:hover td{background:rgba(255,106,0,.05)}
 .solved-badge{position:absolute;top:.75rem;right:.75rem;background:rgba(255,215,0,.15);border:1px solid rgba(255,215,0,.5);color:var(--yellow);font-size:.65rem;padding:2px 6px;border-radius:2px;font-family:'Bangers',cursive;letter-spacing:.1em}
 .cat-header{grid-column:1/-1;font-family:'Bangers',cursive;font-size:1.1rem;letter-spacing:.2em;color:var(--orange);padding:.5rem 0;border-bottom:1px solid rgba(255,106,0,.3);margin-bottom:.5rem;display:flex;align-items:center;gap:.75rem}
 .cat-header::before{content:'◈';color:var(--yellow)}
-
-/* ── MODAL ── */
 .modal-overlay{position:fixed;inset:0;background:rgba(5,2,0,.92);display:none;align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(4px)}
 .modal-overlay.active{display:flex;animation:modalin .3s ease}
 @keyframes modalin{0%{opacity:0}100%{opacity:1}}
@@ -590,8 +1189,6 @@ tr:hover td{background:rgba(255,106,0,.05)}
 .result-msg.wrong{background:rgba(255,26,26,.1);border:1px solid rgba(255,26,26,.4);color:#ff6666;animation:wrongshake .4s ease}
 @keyframes correctflash{0%{background:rgba(255,215,0,.4)}100%{background:rgba(255,215,0,.15)}}
 @keyframes wrongshake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
-
-/* ── HINTS ── */
 .hints-section{margin-top:1.5rem;border-top:1px solid rgba(255,106,0,.2);padding-top:1rem}
 .hints-title{font-size:.75rem;color:#c8a878;letter-spacing:.2em;margin-bottom:.75rem;font-weight:700;text-transform:uppercase}
 .hint-item{background:rgba(255,106,0,.05);border:1px solid rgba(255,106,0,.2);border-radius:2px;padding:.75rem;margin-bottom:.5rem;font-size:.85rem}
@@ -600,20 +1197,14 @@ tr:hover td{background:rgba(255,106,0,.05)}
 .hint-text{color:#c8a878;line-height:1.6}
 .hint-unlock-btn{padding:.35rem .75rem;font-family:'Bangers',cursive;font-size:.85rem;border:1px solid var(--red);background:transparent;color:var(--red);cursor:pointer;border-radius:2px;transition:all .2s;letter-spacing:.1em}
 .hint-unlock-btn:hover{background:rgba(255,26,26,.1);box-shadow:0 0 10px rgba(255,26,26,.3)}
-
-/* ── LIVE FEED ── */
 .live-feed{max-height:400px;overflow-y:auto}
 .feed-item{padding:.6rem 0;border-bottom:1px solid rgba(255,106,0,.1);font-size:.88rem;display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;transition:background .2s}
 .feed-item:hover{background:rgba(255,106,0,.05);padding-left:.5rem}
 .feed-time{color:#806040;flex-shrink:0;font-family:'Share Tech Mono',monospace;font-size:.8rem}
 .feed-team{color:var(--yellow);font-weight:700}
 .feed-pts{color:var(--orange);margin-left:auto;font-family:'Bangers',cursive;font-size:1.1rem}
-
-/* ── SCOREBOARD ── */
 .graph-container{background:rgba(0,0,0,.5);border:1px solid rgba(255,106,0,.2);border-radius:4px;padding:1.5rem;margin-bottom:2rem}
 .graph-title{font-family:'Bangers',cursive;font-size:1.1rem;color:var(--orange);letter-spacing:.2em;margin-bottom:1rem}
-
-/* ── USER BAR ── */
 .user-bar{display:flex;align-items:center;gap:.75rem}
 .user-badge{font-family:'Bangers',cursive;font-size:.9rem;letter-spacing:.1em;color:var(--yellow);border:1px solid rgba(255,215,0,.4);padding:4px 12px;border-radius:2px;background:rgba(255,215,0,.1)}
 .logout-btn{font-family:'Bangers',cursive;font-size:.85rem;letter-spacing:.1em;color:#c8a878;cursor:pointer;border:1px solid rgba(255,106,0,.3);padding:4px 12px;border-radius:2px;background:none;transition:all .2s}
@@ -624,13 +1215,9 @@ tr:hover td{background:rgba(255,106,0,.05)}
 .login-prompt a:hover{background:rgba(255,106,0,.15)}
 .cert-btn{background:none;border:1px solid rgba(255,215,0,.4);color:var(--yellow);padding:.4rem .8rem;font-family:'Bangers',cursive;font-size:.85rem;letter-spacing:.1em;cursor:pointer;border-radius:2px;transition:all .2s}
 .cert-btn:hover{background:rgba(255,215,0,.1)}
-
-/* ── DRAGON BALLS ── */
 .dragonballs{display:flex;justify-content:center;gap:.75rem;margin:1rem auto}
 .dball{width:18px;height:18px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#fff8e0,var(--yellow) 40%,var(--orange) 80%,#8b4500);box-shadow:0 0 8px rgba(255,215,0,.5);position:relative;transition:transform .2s;cursor:default}
 .dball:hover{transform:scale(1.3);box-shadow:0 0 15px rgba(255,215,0,.8)}
-
-/* ── MISC ── */
 .grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:2rem}
 ::-webkit-scrollbar{width:6px}
 ::-webkit-scrollbar-track{background:#0a0500}
@@ -683,6 +1270,7 @@ LOGIN_HTML = """<!DOCTYPE html>
 .login-wrapper{min-height:100vh;display:flex;align-items:center;justify-content:center;position:relative;z-index:10}
 </style></head>
 <body>
+""" + DBZ_INTRO + """
 <div id="characters-layer"></div>
 <div class="scouter-scan"></div>
 <div class="energy-lines">
@@ -748,6 +1336,7 @@ REGISTER_HTML = """<!DOCTYPE html>
 <head><meta charset="UTF-8"><title>Register - {{ ctf_name }}</title>
 <style>""" + BASE_STYLE + """</style></head>
 <body>
+""" + DBZ_INTRO + """
 <div id="characters-layer"></div>
 <div class="scouter-scan"></div>
 <header class="header">
@@ -909,6 +1498,7 @@ INDEX_HTML = """<!DOCTYPE html>
 <style>""" + BASE_STYLE + """</style>
 </head>
 <body>
+""" + DBZ_INTRO + """
 <div id="characters-layer"></div>
 <div class="scouter-scan"></div>
 <div class="energy-lines">
@@ -930,7 +1520,6 @@ INDEX_HTML = """<!DOCTYPE html>
     <div id="auth-links"><a href="/login">LOGIN</a><a href="/register">REGISTER</a></div>
   </nav>
 </header>
-
 <div class="hero">
   <div class="dragon-radar">
     <div class="radar-circle"></div><div class="radar-circle"></div><div class="radar-circle"></div>
@@ -956,7 +1545,6 @@ INDEX_HTML = """<!DOCTYPE html>
     <div class="stat"><div class="stat-value2" id="stat-solves">-</div><div class="stat-label2">💥 Victories</div></div>
   </div>
 </div>
-
 <div class="section">
   <div class="tabs">
     <div class="tab active" onclick="switchTab('challenges')" id="tab-challenges">⚔ CHALLENGES</div>
@@ -986,7 +1574,6 @@ INDEX_HTML = """<!DOCTYPE html>
     <div class="live-feed" id="live-feed"></div>
   </div>
 </div>
-
 <div class="modal-overlay" id="modal">
   <div class="modal">
     <h2 id="modal-title">⚡ SUBMIT FLAG</h2>
@@ -1000,19 +1587,14 @@ INDEX_HTML = """<!DOCTYPE html>
     <div class="hints-section" id="hints-section"></div>
   </div>
 </div>
-
 <script>
 let currentChallenge=null,scoreChart=null;
 const token=localStorage.getItem('ctf_token'),team=localStorage.getItem('ctf_team'),isAdmin=localStorage.getItem('ctf_is_admin')==='true';
 if(token&&team){document.getElementById('user-bar').style.display='flex';document.getElementById('user-name').textContent='⚡ '+team;document.getElementById('auth-links').style.display='none';if(isAdmin)document.getElementById('admin-link').style.display='inline-block'}
-
 function spawnKi(x,y){const p=document.createElement('div');p.className='ki-particle';const s=10+Math.random()*15;p.style.cssText=`left:${x-s/2}px;top:${y-s/2}px;width:${s}px;height:${s}px`;document.body.appendChild(p);setTimeout(()=>p.remove(),600)}
 document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('#characters-layer'))return;spawnKi(e.clientX,e.clientY);for(let i=0;i<2;i++)setTimeout(()=>spawnKi(e.clientX+(Math.random()-.5)*30,e.clientY+(Math.random()-.5)*30),i*80)});
-
 function animatePowerCounter(target){const el=document.getElementById('power-counter');if(!target){el.textContent='SCOUTING...';return}let c=0;const step=Math.ceil(target/60);const iv=setInterval(()=>{c=Math.min(c+step,target);el.textContent=c.toLocaleString();if(c>=target)clearInterval(iv)},16)}
-
 async function api(path,opts={}){const headers={'Content-Type':'application/json'};if(token)headers['Authorization']=`Bearer ${token}`;return(await fetch('/api/v1'+path,{headers,...opts})).json()}
-
 async function loadChallenges(){
   const data=await api('/challenges');
   const myData=token?await api('/me/solves'):{solves:[]};
@@ -1037,7 +1619,6 @@ async function loadChallenges(){
     });
   });
 }
-
 async function loadScoreboard(){
   const data=await api('/scoreboard');
   document.getElementById('stat-teams').textContent=data.scores?.length||0;
@@ -1048,7 +1629,6 @@ async function loadScoreboard(){
   await drawScoreGraph(data.scores.slice(0,5));
   if(data.scores.length)animatePowerCounter(data.scores[0].score);
 }
-
 async function drawScoreGraph(topTeams){
   const timelines=await Promise.all(topTeams.map(t=>api(`/scoreboard/timeline?team=${encodeURIComponent(t.team)}`)));
   const colors=['#ffd700','#ff6a00','#ff1a1a','#00aaff','#aa00ff'];
@@ -1057,7 +1637,6 @@ async function drawScoreGraph(topTeams){
   if(scoreChart)scoreChart.destroy();
   scoreChart=new Chart(ctx,{type:'line',data:{datasets},options:{responsive:true,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{color:'#c8a878',font:{family:'Rajdhani',weight:'700'},boxWidth:12}},tooltip:{backgroundColor:'#120800',borderColor:'#ff6a0066',borderWidth:1,titleColor:'#ffd700',bodyColor:'#f5e6c8'}},scales:{x:{type:'time',time:{unit:'hour'},ticks:{color:'#806040',font:{family:'Share Tech Mono',size:10}},grid:{color:'rgba(255,106,0,.1)'}},y:{ticks:{color:'#806040',font:{family:'Share Tech Mono',size:10}},grid:{color:'rgba(255,106,0,.1)'}}}}});
 }
-
 async function loadFeed(){
   const data=await api('/feed');
   const feed=document.getElementById('live-feed');
@@ -1065,7 +1644,6 @@ async function loadFeed(){
   document.getElementById('stat-solves').textContent=data.events.length;
   feed.innerHTML=data.events.map(e=>`<div class="feed-item"><span class="feed-time">[${e.timestamp}]</span><span class="feed-team">⚡ ${e.team}</span><span style="color:#806040">conquered</span><span style="color:#f5e6c8">${e.challenge}</span>${e.first_blood?'<span style="color:var(--red)">🩸 FIRST BLOOD</span>':''}<span class="feed-pts">+${e.points} PL</span></div>`).join('');
 }
-
 async function openModal(ch){
   currentChallenge=ch;
   document.getElementById('modal-title').textContent='⚡ '+ch.name;
@@ -1076,7 +1654,6 @@ async function openModal(ch){
   document.getElementById('modal').classList.add('active');
   setTimeout(()=>document.getElementById('flag-input').focus(),100);
 }
-
 async function loadHints(ch){
   const section=document.getElementById('hints-section');
   if(!ch.hints?.length){section.innerHTML='';return}
@@ -1088,17 +1665,8 @@ async function loadHints(ch){
     return`<div class="hint-item"><div class="hint-locked"><span style="color:#c8a878">Hint ${i+1}</span><div style="display:flex;align-items:center;gap:.75rem"><span class="hint-cost">-${cost} PL</span><button class="hint-unlock-btn" onclick="unlockHint('${ch.id}',${i},${cost})">UNLOCK</button></div></div></div>`;
   }).join('');
 }
-
-async function unlockHint(cid,hi,cost){
-  if(!token)return window.location.href='/login';
-  if(!confirm(`Sacrifice ${cost} power level for this hint?`))return;
-  const r=await api('/hints/unlock',{method:'POST',body:JSON.stringify({challenge_id:cid,hint_index:hi})});
-  if(r.success)await loadHints(currentChallenge);
-  else alert(r.message||'Failed');
-}
-
+async function unlockHint(cid,hi,cost){if(!token)return window.location.href='/login';if(!confirm(`Sacrifice ${cost} power level for this hint?`))return;const r=await api('/hints/unlock',{method:'POST',body:JSON.stringify({challenge_id:cid,hint_index:hi})});if(r.success)await loadHints(currentChallenge);else alert(r.message||'Failed')}
 function closeModal(){document.getElementById('modal').classList.remove('active');currentChallenge=null}
-
 async function submitFlag(){
   if(!currentChallenge)return;
   const flag=document.getElementById('flag-input').value.trim();
@@ -1112,12 +1680,8 @@ async function submitFlag(){
   msg.style.display='block';
   msg.className='result-msg '+(data.correct?'correct':'wrong');
   msg.textContent=data.correct?'🐉 CHALLENGE CONQUERED! POWER LEVEL RISING!':'💀 '+data.message;
-  if(data.correct){
-    for(let i=0;i<20;i++)setTimeout(()=>spawnKi(Math.random()*window.innerWidth,Math.random()*window.innerHeight),i*60);
-    setTimeout(()=>{closeModal();loadChallenges();loadScoreboard();loadFeed()},2000);
-  }
+  if(data.correct){for(let i=0;i<20;i++)setTimeout(()=>spawnKi(Math.random()*window.innerWidth,Math.random()*window.innerHeight),i*60);setTimeout(()=>{closeModal();loadChallenges();loadScoreboard();loadFeed()},2000)}
 }
-
 function getCertificate(teamName,rank){window.open(`/certificate/${teamName}?rank=${rank}`,'_blank')}
 function switchTab(name){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.getElementById('tab-'+name).classList.add('active');document.getElementById('panel-'+name).classList.add('active');if(name==='scoreboard')loadScoreboard();if(name==='feed')loadFeed()}
 function logout(){fetch('/api/v1/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}});localStorage.clear();window.location.href='/login'}
@@ -1140,14 +1704,12 @@ body{background:radial-gradient(ellipse at center,#1a0800 0%,#0a0300 60%,#050100
 .cert{background:linear-gradient(135deg,rgba(25,12,0,.98),rgba(10,5,0,.99));border:3px solid #ff6a00;border-radius:8px;padding:4rem;max-width:800px;width:100%;text-align:center;position:relative;box-shadow:0 0 80px rgba(255,106,0,.3),0 0 160px rgba(255,106,0,.1)}
 .cert::before{content:'';position:absolute;inset:10px;border:1px solid rgba(255,215,0,.2);border-radius:4px;pointer-events:none}
 .corner{position:absolute;width:24px;height:24px;border-color:#ffd700;border-style:solid}
-.corner-tl{top:18px;left:18px;border-width:3px 0 0 3px}
-.corner-tr{top:18px;right:18px;border-width:3px 3px 0 0}
-.corner-bl{bottom:18px;left:18px;border-width:0 0 3px 3px}
-.corner-br{bottom:18px;right:18px;border-width:0 3px 3px 0}
+.corner-tl{top:18px;left:18px;border-width:3px 0 0 3px}.corner-tr{top:18px;right:18px;border-width:3px 3px 0 0}
+.corner-bl{bottom:18px;left:18px;border-width:0 0 3px 3px}.corner-br{bottom:18px;right:18px;border-width:0 3px 3px 0}
 .cert-logo{font-family:'Bangers',cursive;font-size:1rem;color:rgba(255,106,0,.6);letter-spacing:.3em;margin-bottom:2rem}
 .cert-title{font-family:'Bangers',cursive;font-size:3rem;background:linear-gradient(135deg,#fff,#ffd700,#ff6a00);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:.5rem;letter-spacing:.1em}
 .cert-subtitle{color:rgba(255,215,0,.7);font-size:.9rem;letter-spacing:.3em;margin-bottom:3rem;font-weight:700;text-transform:uppercase}
-.cert-text{color:#a08060;font-size:.95rem;margin-bottom:.75rem;letter-spacing:.05em}
+.cert-text{color:#a08060;font-size:.95rem;margin-bottom:.75rem}
 .cert-name{font-family:'Bangers',cursive;font-size:2.5rem;color:#fff;margin:1rem 0;padding:.75rem 2rem;border:2px solid rgba(255,215,0,.5);display:inline-block;background:rgba(255,215,0,.05);border-radius:4px;letter-spacing:.1em;text-shadow:0 0 20px rgba(255,215,0,.5)}
 .cert-rank{font-family:'Bangers',cursive;font-size:3.5rem;color:#ffd700;margin:1rem 0;text-shadow:0 0 30px rgba(255,215,0,.6)}
 .cert-details{display:flex;justify-content:center;gap:3rem;margin:2rem 0;padding:1.5rem;border-top:1px solid rgba(255,106,0,.3);border-bottom:1px solid rgba(255,106,0,.3)}
@@ -1160,17 +1722,13 @@ body{background:radial-gradient(ellipse at center,#1a0800 0%,#0a0300 60%,#050100
 .dragonballs{display:flex;justify-content:center;gap:.75rem;margin:1rem 0}
 .dball{width:20px;height:20px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#fff8e0,#ffd700 40%,#ff6a00 80%,#8b4500);box-shadow:0 0 10px rgba(255,215,0,.5)}
 @media print{.print-btn{display:none}}
-</style>
-</head>
+</style></head>
 <body>
 <div class="cert">
   <div class="corner corner-tl"></div><div class="corner corner-tr"></div>
   <div class="corner corner-bl"></div><div class="corner corner-br"></div>
   <div class="cert-logo">🐉 {{ ctf_name | upper }} // CTF 🐉</div>
-  <div class="dragonballs">
-    <div class="dball"></div><div class="dball"></div><div class="dball"></div>
-    <div class="dball"></div><div class="dball"></div><div class="dball"></div><div class="dball"></div>
-  </div>
+  <div class="dragonballs"><div class="dball"></div><div class="dball"></div><div class="dball"></div><div class="dball"></div><div class="dball"></div><div class="dball"></div><div class="dball"></div></div>
   <div class="cert-title">CERTIFICATE</div>
   <div class="cert-subtitle">⚡ Of Warrior Achievement ⚡</div>
   <div class="cert-text">This certifies that the mighty warrior</div>
