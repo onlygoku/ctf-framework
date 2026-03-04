@@ -1,10 +1,13 @@
 """
 Web App - CTF Platform - Dragon Ball Z Theme with Pixel Art Characters
++ CTF Team Registration System (Captain + Members + Invite Code + Team Card + Aura + Avatar)
 """
 
 import sys
 import os
 import traceback
+import secrets
+import string
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from flask import Flask, request, jsonify, render_template_string
@@ -20,11 +23,9 @@ from ctf_core.auth import AuthManager
 
 # ─────────────────────────────────────────────────────────────────────
 # PIXEL ART CHARACTER SYSTEM
-# Each character is drawn with CSS box-shadow pixel art technique
 # ─────────────────────────────────────────────────────────────────────
 
 PIXEL_ART_CSS = """
-/* ── PIXEL ART BASE ── */
 .px { display:inline-block; width:4px; height:4px; position:relative; }
 .char-wrap {
   position:absolute; bottom:0; cursor:pointer; pointer-events:auto;
@@ -34,42 +35,28 @@ PIXEL_ART_CSS = """
   position:relative; width:48px; height:80px;
   image-rendering:pixelated;
 }
-
-/* ── WALK ANIMATION ── */
 @keyframes walkBob  { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-3px)} }
 @keyframes runBob   { 0%,100%{transform:translateY(0)} 25%{transform:translateY(-5px)} 75%{transform:translateY(-2px)} }
 @keyframes idleBreath{ 0%,100%{transform:scaleY(1)} 50%{transform:scaleY(0.97)} }
 @keyframes jumpArc  { 0%{transform:translateY(0) rotate(0deg)} 40%{transform:translateY(-90px) rotate(-10deg)} 60%{transform:translateY(-90px) rotate(10deg)} 100%{transform:translateY(0) rotate(0deg)} }
 @keyframes powerUp  { 0%{filter:brightness(1)} 30%{filter:brightness(2) saturate(2)} 60%{filter:brightness(3) saturate(3)} 100%{filter:brightness(1)} }
 @keyframes ssjFlare { 0%,100%{box-shadow:0 0 20px #ffd700, 0 0 40px #ff6a00} 50%{box-shadow:0 0 40px #fff, 0 0 80px #ffd700, 0 0 120px #ff6a00} }
-@keyframes fightKick{ 0%{transform:rotate(0deg)} 30%{transform:rotate(-15deg) translateX(8px)} 70%{transform:rotate(15deg) translateX(-8px)} 100%{transform:rotate(0deg)} }
-@keyframes chargeKi { 0%{opacity:0.4;transform:scale(0.8)} 50%{opacity:1;transform:scale(1.1)} 100%{opacity:0.4;transform:scale(0.8)} }
 @keyframes floatUp  { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-12px)} }
-@keyframes legLeft  { 0%,100%{transform:rotate(20deg)} 50%{transform:rotate(-20deg)} }
-@keyframes legRight { 0%,100%{transform:rotate(-20deg)} 50%{transform:rotate(20deg)} }
-@keyframes armSwing { 0%,100%{transform:rotate(-25deg)} 50%{transform:rotate(25deg)} }
-@keyframes hairFlap { 0%,100%{transform:skewX(0deg)} 50%{transform:skewX(5deg)} }
 @keyframes auraRing { 0%{transform:translateX(-50%) scaleX(0.7);opacity:0.3} 100%{transform:translateX(-50%) scaleX(1.1);opacity:0.8} }
 @keyframes kiOrb    { 0%,100%{transform:scale(1) rotate(0deg);opacity:0.8} 50%{transform:scale(1.3) rotate(180deg);opacity:1} }
 @keyframes explosion{ 0%{transform:scale(0);opacity:1} 100%{transform:scale(4);opacity:0} }
-@keyframes kiBlast  { 0%{transform:scale(0);opacity:1} 100%{transform:scale(2.5);opacity:0} }
-@keyframes screenShake{ 0%,100%{transform:translate(0,0)} 20%{transform:translate(-4px,2px)} 40%{transform:translate(4px,-2px)} 60%{transform:translate(-3px,3px)} 80%{transform:translate(3px,-1px)} }
-
-/* ── AURA ── */
 .char-aura {
   position:absolute; bottom:-6px; left:50%;
   border-radius:50%; filter:blur(10px);
   animation:auraRing 1.2s ease-in-out infinite alternate;
   pointer-events:none; z-index:0;
 }
-/* ── KI ORB ── */
 .ki-orb {
   position:absolute; border-radius:50%;
   background:radial-gradient(circle at 35% 35%,#fff,currentColor);
   animation:kiOrb 1.8s ease-in-out infinite;
   pointer-events:none;
 }
-/* ── SPEECH BUBBLE ── */
 .speech-bubble {
   position:absolute; bottom:calc(100% + 8px); left:50%;
   transform:translateX(-50%);
@@ -93,16 +80,165 @@ PIXEL_ART_CSS = """
 }
 """
 
+# ─────────────────────────────────────────────────────────────────────
+# TEAM SYSTEM CSS
+# ─────────────────────────────────────────────────────────────────────
+
+TEAM_CSS = """
+/* ══ CTF TEAM REGISTRATION SYSTEM ══════════════════════════════════ */
+:root {
+  --aura-from: #ff6a00; --aura-to: #ffd700;
+  --aura-r: 255; --aura-g: 106; --aura-b: 0;
+}
+/* Team Card */
+.team-card {
+  background:linear-gradient(135deg,rgba(18,8,0,.97),rgba(10,5,0,.99));
+  border:2px solid var(--aura-from);border-radius:6px;
+  position:relative;overflow:hidden;transition:box-shadow .3s,transform .3s;
+  box-shadow:0 0 30px rgba(var(--aura-r),var(--aura-g),var(--aura-b),.18);
+}
+.team-card:hover { transform:translateY(-4px); box-shadow:0 8px 40px rgba(var(--aura-r),var(--aura-g),var(--aura-b),.35); }
+.team-card::before {
+  content:'';position:absolute;top:0;left:0;right:0;height:4px;
+  background:linear-gradient(90deg,var(--aura-from),var(--aura-to),var(--aura-from));
+  background-size:200% 100%;animation:auraflow 3s linear infinite;
+}
+@keyframes auraflow{0%{background-position:0%}100%{background-position:200%}}
+.team-card-banner {
+  height:88px;position:relative;overflow:hidden;
+  background:linear-gradient(135deg,rgba(var(--aura-r),var(--aura-g),var(--aura-b),.22),rgba(0,0,0,.85));
+}
+.team-card-banner::after {
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse at 50% 120%,rgba(var(--aura-r),var(--aura-g),var(--aura-b),.4),transparent 65%);
+}
+.team-banner-name {
+  position:absolute;bottom:10px;left:14px;z-index:2;
+  font-family:'Bangers',cursive;font-size:1.7rem;letter-spacing:.15em;
+  color:#fff;text-shadow:0 0 20px rgba(var(--aura-r),var(--aura-g),var(--aura-b),.9),0 2px 4px #000;
+}
+.team-banner-tag {
+  position:absolute;top:10px;left:14px;z-index:2;
+  font-size:.65rem;letter-spacing:.2em;color:rgba(255,255,255,.55);
+  font-family:'Share Tech Mono',monospace;text-transform:uppercase;
+}
+.team-avatar-row {
+  position:absolute;right:10px;top:50%;transform:translateY(-50%);
+  display:flex;align-items:center;gap:5px;z-index:2;flex-direction:row-reverse;
+}
+.team-avatar-bubble {
+  width:40px;height:40px;border-radius:50%;
+  background:rgba(0,0,0,.75);border:2px solid rgba(var(--aura-r),var(--aura-g),var(--aura-b),.5);
+  display:flex;align-items:center;justify-content:center;font-size:1.2rem;
+  box-shadow:0 0 10px rgba(var(--aura-r),var(--aura-g),var(--aura-b),.35);
+  transition:transform .2s;cursor:default;
+}
+.team-avatar-bubble:hover{transform:scale(1.18)}
+.team-avatar-bubble.captain{
+  width:50px;height:50px;font-size:1.5rem;
+  border-color:rgba(var(--aura-r),var(--aura-g),var(--aura-b),1);
+  box-shadow:0 0 18px rgba(var(--aura-r),var(--aura-g),var(--aura-b),.7);
+}
+.team-card-body{padding:.9rem 1.1rem 1.1rem}
+.team-invite-code {
+  display:flex;align-items:center;justify-content:space-between;
+  background:rgba(0,0,0,.5);border:1px solid rgba(255,106,0,.22);
+  border-radius:3px;padding:.45rem .7rem;margin-bottom:.7rem;
+  font-family:'Share Tech Mono',monospace;font-size:.82rem;color:#ffd700;
+  letter-spacing:.18em;cursor:pointer;transition:all .2s;
+  position:relative;overflow:hidden;
+}
+.team-invite-code:hover{border-color:var(--aura-from);box-shadow:0 0 10px rgba(var(--aura-r),var(--aura-g),var(--aura-b),.3)}
+.team-invite-code::after{content:'📋 COPY';font-size:.6rem;color:#806040;letter-spacing:.1em;font-family:'Rajdhani',sans-serif;font-weight:700}
+.team-invite-label{font-size:.6rem;color:#806040;letter-spacing:.2em;font-weight:700;text-transform:uppercase;margin-bottom:1px}
+.team-member-list{display:flex;flex-direction:column;gap:.35rem;margin-bottom:.7rem}
+.team-member-row {
+  display:flex;align-items:center;gap:.55rem;
+  padding:.38rem .55rem;border-radius:3px;
+  background:rgba(255,106,0,.04);border:1px solid rgba(255,106,0,.09);
+  transition:all .2s;position:relative;
+}
+.team-member-row:hover{background:rgba(255,106,0,.09);border-color:rgba(255,106,0,.25)}
+.member-avatar{font-size:1rem;flex-shrink:0;width:24px;text-align:center}
+.member-name{flex:1;font-size:.85rem;font-weight:700;color:#f5e6c8;font-family:'Rajdhani',sans-serif}
+.member-badge{font-size:.62rem;padding:2px 6px;border-radius:2px;font-family:'Bangers',cursive;letter-spacing:.1em;flex-shrink:0}
+.member-badge.captain{background:rgba(255,215,0,.15);color:#ffd700;border:1px solid rgba(255,215,0,.4)}
+.member-badge.member{background:rgba(255,106,0,.1);color:#ff9944;border:1px solid rgba(255,106,0,.3)}
+.member-kick-btn{background:none;border:none;color:#ff444488;cursor:pointer;font-size:.75rem;padding:0 2px;line-height:1;transition:color .2s}
+.member-kick-btn:hover{color:#ff4444}
+.team-score-row{display:flex;gap:.6rem}
+.team-score-box{
+  flex:1;text-align:center;padding:.55rem .25rem;
+  background:rgba(0,0,0,.4);border:1px solid rgba(255,106,0,.12);border-radius:3px;
+}
+.team-score-val{font-family:'Bangers',cursive;font-size:1.35rem;color:var(--aura-from)}
+.team-score-lbl{font-size:.62rem;color:#806040;letter-spacing:.12em;text-transform:uppercase;font-weight:700}
+.team-slot-empty{
+  display:flex;align-items:center;gap:.55rem;
+  padding:.38rem .55rem;border-radius:3px;
+  background:rgba(255,106,0,.02);border:1px dashed rgba(255,106,0,.12);
+  color:#5a3a20;font-size:.78rem;font-style:italic;
+}
+/* Aura picker */
+.aura-picker{display:grid;grid-template-columns:repeat(4,1fr);gap:.45rem;margin-bottom:.9rem}
+.aura-swatch{
+  height:34px;border-radius:3px;cursor:pointer;border:2px solid transparent;
+  position:relative;overflow:hidden;transition:all .2s;
+}
+.aura-swatch:hover{transform:scale(1.07);border-color:#fff5}
+.aura-swatch.selected{border-color:#fff;box-shadow:0 0 12px #fff8}
+.aura-swatch-label{font-size:.58rem;position:absolute;bottom:2px;left:0;right:0;text-align:center;font-family:'Bangers',cursive;letter-spacing:.06em;color:#fff;text-shadow:0 1px 3px #000}
+/* Avatar picker */
+.avatar-picker{display:grid;grid-template-columns:repeat(6,1fr);gap:.38rem;margin-bottom:.9rem}
+.avatar-option{
+  aspect-ratio:1;border-radius:50%;border:2px solid rgba(255,106,0,.2);
+  display:flex;align-items:center;justify-content:center;font-size:1.35rem;
+  cursor:pointer;background:rgba(0,0,0,.4);transition:all .2s;
+}
+.avatar-option:hover{border-color:var(--orange);transform:scale(1.1);background:rgba(255,106,0,.12)}
+.avatar-option.selected{border-color:#ffd700;background:rgba(255,215,0,.15);box-shadow:0 0 12px rgba(255,215,0,.4)}
+/* Teams grid layout */
+.teams-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1.2rem;margin-top:1.2rem}
+/* Create/Join team panels */
+.team-action-panel{
+  background:linear-gradient(135deg,rgba(18,8,0,.97),rgba(10,5,0,.99));
+  border:1px solid rgba(255,106,0,.3);border-radius:6px;padding:1.5rem;
+  position:relative;overflow:hidden;
+}
+.team-action-panel::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,var(--orange),var(--yellow),var(--orange),transparent)}
+/* My team highlight */
+.my-team-banner{
+  background:linear-gradient(90deg,rgba(255,215,0,.12),rgba(255,106,0,.08));
+  border:1px solid rgba(255,215,0,.35);border-radius:4px;
+  padding:.6rem 1rem;margin-bottom:1rem;
+  display:flex;align-items:center;gap:.75rem;
+  font-family:'Bangers',cursive;font-size:1rem;letter-spacing:.1em;color:#ffd700;
+}
+/* Invite join banner */
+.join-via-code{
+  background:rgba(0,0,0,.5);border:1px solid rgba(255,106,0,.25);border-radius:4px;
+  padding:1rem;margin-bottom:1rem;
+}
+/* Size bar */
+.team-size-bar{display:flex;gap:3px;margin-top:.35rem}
+.size-pip{width:18px;height:5px;border-radius:2px;background:rgba(255,106,0,.15);border:1px solid rgba(255,106,0,.2);transition:background .3s}
+.size-pip.filled{background:var(--aura-from);border-color:var(--aura-from);box-shadow:0 0 6px rgba(var(--aura-r),var(--aura-g),var(--aura-b),.5)}
+/* Copied toast */
+.copy-toast{
+  position:fixed;bottom:2rem;right:2rem;z-index:9999;
+  background:rgba(255,215,0,.15);border:1px solid rgba(255,215,0,.5);
+  color:#ffd700;padding:.6rem 1.2rem;border-radius:3px;
+  font-family:'Bangers',cursive;font-size:.95rem;letter-spacing:.1em;
+  opacity:0;transform:translateY(10px);transition:all .3s;pointer-events:none;
+}
+.copy-toast.show{opacity:1;transform:translateY(0)}
+"""
+
 PIXEL_CHARS_JS = r"""
 (function(){
 'use strict';
 
-// ── PIXEL ART RENDERER ──────────────────────────────────────────────
-// Each character defined as a 12x20 grid of colored pixels
-// Colors: 0=transparent, other=hex string key in palette
-
 const PAL = {
-  // Shared
   W:'#fff', SK:'#f5c97a', SK2:'#e8a85a', DK:'#1a0800',
   BK:'#111', OR:'#ff6a00', YL:'#ffd700', RD:'#ff2200',
   BL:'#1a44cc', PU:'#7700cc', GR:'#116611', GY:'#888',
@@ -110,43 +246,32 @@ const PAL = {
   OG:'#ff8800', TL:'#00bbaa', SL:'#ccccdd', CY:'#00ddff',
 };
 
-// 12-wide x 20-tall pixel maps  (row by row, top to bottom)
-// Values are palette keys or 0 (transparent)
 const SPRITES = {
 
 goku:[
-  // Hair (spiky, black)
   [0,0,'BK','BK','BK','BK','BK','BK','BK',0,0,0],
   [0,'BK','BK','BK','BK','BK','BK','BK','BK','BK',0,0],
   ['BK','BK','BK','SK','SK','SK','SK','SK','BK','BK','BK',0],
-  // Face
   [0,'BK','SK','SK','SK','SK','SK','SK','SK','BK',0,0],
-  [0,'SK','SK','W','BK','SK','W','BK','SK','SK',0,0], // eyes
+  [0,'SK','SK','W','BK','SK','W','BK','SK','SK',0,0],
   [0,'SK','SK','SK','SK','SK','SK','SK','SK','SK',0,0],
-  [0,'SK','SK','SK','OR','SK','SK','OR','SK','SK',0,0], // cheeks/nose
+  [0,'SK','SK','SK','OR','SK','SK','OR','SK','SK',0,0],
   [0,0,'SK','SK','SK','SK','SK','SK','SK',0,0,0],
-  // Neck + shoulders
   [0,0,0,'SK','SK','SK','SK','SK',0,0,0,0],
-  // Gi top (orange)
   [0,'OR','OR','OR','OR','OR','OR','OR','OR','OR',0,0],
-  [0,'OR','BL','OR','OR','OR','OR','OR','BL','OR',0,0], // belt detail
+  [0,'OR','BL','OR','OR','OR','OR','OR','BL','OR',0,0],
   ['OR','OR','OR','OR','OR','OR','OR','OR','OR','OR','OR',0],
-  // Belt (blue)
   [0,'BL','BL','BL','BL','BL','BL','BL','BL','BL',0,0],
-  // Gi pants (blue)
   [0,'BL','BL','OR','BL','BL','BL','OR','BL','BL',0,0],
   [0,'BL','BL','OR','BL','BL','BL','OR','BL','BL',0,0],
   [0,'BL','BL','OR','BL','BL','BL','OR','BL','BL',0,0],
-  // Legs
   [0,0,'OR','OR','BL',0,0,'BL','OR','OR',0,0],
   [0,0,'OR','OR','BL',0,0,'BL','OR','OR',0,0],
-  // Boots (red)
   [0,0,'RD','RD','RD',0,0,'RD','RD','RD',0,0],
   [0,0,'RD','RD','RD',0,0,'RD','RD','RD',0,0],
 ],
 
 goku_ssj:[
-  // Hair (golden/yellow)
   [0,0,'YL','YL','YL','YL','YL','YL','YL',0,0,0],
   [0,'YL','YL','YL','YL','YL','YL','YL','YL','YL',0,0],
   ['YL','YL','YL','SK','SK','SK','SK','SK','YL','YL','YL',0],
@@ -170,23 +295,19 @@ goku_ssj:[
 ],
 
 vegeta:[
-  // Widow peak hair
   [0,'BK','BK','BK','BK','BK','BK','BK','BK','BK',0,0],
   ['BK','BK','BK','BK','BK','BK','BK','BK','BK','BK','BK',0],
   ['BK','BK','BK','SK','SK','SK','SK','SK','BK','BK','BK',0],
   [0,'BK','SK','SK','SK','SK','SK','SK','SK','BK',0,0],
   [0,'SK','SK','W','BK','SK','W','BK','SK','SK',0,0],
   [0,'SK','SK','SK','SK','SK','SK','SK','SK','SK',0,0],
-  [0,'SK','SK','SK',0,'SK','SK',0,'SK','SK',0,0], // stern face
+  [0,'SK','SK','SK',0,'SK','SK',0,'SK','SK',0,0],
   [0,0,'SK','SK','SK','SK','SK','SK','SK',0,0,0],
   [0,0,0,'SK','SK','SK','SK','SK',0,0,0,0],
-  // Saiyan armor (white/gold)
   [0,'WH','WH','WH','WH','WH','WH','WH','WH','WH',0,0],
   [0,'WH','YL','WH','WH','WH','WH','WH','YL','WH',0,0],
   ['WH','WH','WH','WH','WH','WH','WH','WH','WH','WH','WH',0],
-  // Belt
   [0,'BK','BK','BK','BK','BK','BK','BK','BK','BK',0,0],
-  // Pants (blue/navy)
   [0,'NV','NV','WH','NV','NV','NV','WH','NV','NV',0,0],
   [0,'NV','NV','WH','NV','NV','NV','WH','NV','NV',0,0],
   [0,'NV','NV','WH','NV','NV','NV','WH','NV','NV',0,0],
@@ -197,572 +318,6 @@ vegeta:[
 ],
 
 piccolo:[
-  // Antennae + head
-  [0,0,0,'LG','LG',0,0,'LG','LG',0,0,0],
-  [0,0,0,'LG','LG',0,0,'LG','LG',0,0,0],
-  [0,0,'LG','LG','LG','LG','LG','LG','LG','LG',0,0],
-  [0,'LG','LG','LG','LG','LG','LG','LG','LG','LG','LG',0],
-  [0,'LG','LG','W','BK','LG','W','BK','LG','LG',0,0],// eyes (white pupils)
-  [0,'LG','LG','LG','LG','LG','LG','LG','LG','LG',0,0],
-  [0,'LG','LG','LG','LG','LG','LG','LG','LG','LG',0,0],
-  [0,0,'LG','LG','LG','LG','LG','LG','LG',0,0,0],
-  [0,0,0,'LG','LG','LG','LG','LG',0,0,0,0],
-  // Purple gi / cape
-  [0,'PU','PU','PU','PU','PU','PU','PU','PU','PU',0,0],
-  [0,'PU','WH','PU','PU','PU','PU','PU','WH','PU',0,0],
-  ['PU','PU','PU','PU','PU','PU','PU','PU','PU','PU','PU',0],
-  [0,'WH','WH','WH','WH','WH','WH','WH','WH','WH',0,0],
-  // Pants (purple)
-  [0,'PU','PU','WH','PU','PU','PU','WH','PU','PU',0,0],
-  [0,'PU','PU','WH','PU','PU','PU','WH','PU','PU',0,0],
-  [0,'PU','PU','WH','PU','PU','PU','WH','PU','PU',0,0],
-  [0,0,'PU','PU','PU',0,0,'PU','PU','PU',0,0],
-  [0,0,'PU','PU','PU',0,0,'PU','PU','PU',0,0],
-  [0,0,'WH','WH','WH',0,0,'WH','WH','WH',0,0],
-  [0,0,'WH','WH','WH',0,0,'WH','WH','WH',0,0],
-],
-
-frieza:[
-  // Head (white/purple markings)
-  [0,0,'WH','WH','WH','WH','WH','WH','WH',0,0,0],
-  [0,'WH','WH','WH','WH','WH','WH','WH','WH','WH',0,0],
-  [0,'WH','PU','WH','WH','WH','WH','WH','PU','WH',0,0], // head markings
-  [0,'WH','WH','WH','WH','WH','WH','WH','WH','WH',0,0],
-  [0,'WH','WH','RD','BK','WH','RD','BK','WH','WH',0,0], // creepy eyes
-  [0,'WH','WH','WH','WH','WH','WH','WH','WH','WH',0,0],
-  [0,'WH','PU','WH','WH','WH','WH','WH','PU','WH',0,0],
-  [0,0,'WH','WH','WH','WH','WH','WH','WH',0,0,0],
-  [0,0,0,'WH','WH','WH','WH','WH',0,0,0,0],
-  // Armor (white/purple)
-  [0,'WH','WH','WH','WH','WH','WH','WH','WH','WH',0,0],
-  [0,'WH','PU','WH','WH','WH','WH','WH','PU','WH',0,0],
-  ['WH','WH','WH','WH','WH','WH','WH','WH','WH','WH','WH',0],
-  [0,'PU','PU','PU','PU','PU','PU','PU','PU','PU',0,0],
-  // Tail + legs (long)
-  [0,'WH','WH','PU','WH','WH','WH','PU','WH','WH',0,0],
-  [0,'WH','WH','PU','WH','WH','WH','PU','WH','WH',0,0],
-  [0,'WH','WH','PU','WH','WH','WH','PU','WH','WH',0,0],
-  [0,0,'WH','WH','WH',0,0,'WH','WH','WH',0,0],
-  [0,0,'WH','WH','WH',0,0,'WH','WH','WH',0,0],
-  [0,0,'PU','PU','PU',0,0,'PU','PU','PU',0,0],
-  [0,0,'PU','PU','PU',0,0,'PU','PU','PU',0,0],
-],
-
-gohan:[
-  // Hair (black, similar to goku but shorter)
-  [0,0,'BK','BK','BK','BK','BK','BK',0,0,0,0],
-  [0,'BK','BK','BK','BK','BK','BK','BK','BK','BK',0,0],
-  ['BK','BK','BK','SK','SK','SK','SK','SK','BK','BK',0,0],
-  [0,'BK','SK','SK','SK','SK','SK','SK','SK','BK',0,0],
-  [0,'SK','SK','W','BK','SK','W','BK','SK','SK',0,0],
-  [0,'SK','SK','SK','SK','SK','SK','SK','SK','SK',0,0],
-  [0,'SK','SK','SK',0,'SK','SK',0,'SK','SK',0,0],
-  [0,0,'SK','SK','SK','SK','SK','SK','SK',0,0,0],
-  [0,0,0,'SK','SK','SK','SK','SK',0,0,0,0],
-  // Purple gi
-  [0,'PU','PU','PU','PU','PU','PU','PU','PU','PU',0,0],
-  [0,'PU','YL','PU','PU','PU','PU','PU','YL','PU',0,0],
-  ['PU','PU','PU','PU','PU','PU','PU','PU','PU','PU','PU',0],
-  [0,'YL','YL','YL','YL','YL','YL','YL','YL','YL',0,0],
-  [0,'BL','BL','YL','BL','BL','BL','YL','BL','BL',0,0],
-  [0,'BL','BL','YL','BL','BL','BL','YL','BL','BL',0,0],
-  [0,'BL','BL','YL','BL','BL','BL','YL','BL','BL',0,0],
-  [0,0,'BL','BL','BL',0,0,'BL','BL','BL',0,0],
-  [0,0,'BL','BL','BL',0,0,'BL','BL','BL',0,0],
-  [0,0,'BK','BK','BK',0,0,'BK','BK','BK',0,0],
-  [0,0,'BK','BK','BK',0,0,'BK','BK','BK',0,0],
-],
-};
-
-// ── BUILD CHARACTER SVG ────────────────────────────────────────────
-function buildPixelChar(spriteKey, scale=4) {
-  const grid = SPRITES[spriteKey];
-  const cols = 12, rows = 20;
-  const W = cols * scale, H = rows * scale;
-  let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" shape-rendering="crispEdges">`;
-  for (let r=0; r<rows; r++) {
-    for (let c=0; c<cols; c++) {
-      const v = grid[r][c];
-      if (!v || v === 0) continue;
-      const col = PAL[v] || v;
-      svg += `<rect x="${c*scale}" y="${r*scale}" width="${scale}" height="${scale}" fill="${col}"/>`;
-    }
-  }
-  svg += '</svg>';
-  return 'data:image/svg+xml;base64,' + btoa(svg);
-}
-
-// ── CHARACTER DEFINITIONS ──────────────────────────────────────────
-const CHARS = [
-  {
-    id:'goku', name:'Goku', sprite:'goku', ssjSprite:'goku_ssj',
-    aura:'#ffd700', glow:'#ff6a00', speed:1.4, jumpH:200,
-    x:80,  vx:1.4,  flipped:false, state:'walk', timer:100,
-    isSSJ:false, y:0, vy:0, jumping:false,
-    quotes:['KAMEHAMEHA!!','I need to get stronger!','KAIO-KEN x10!'],
-    fightQ:['KAMEHAMEHA!!','KAIO-KEN!!','This ends NOW!'],
-    powerQ:["I'M GOING SUPER SAIYAN!",'AAAAHHHH!!!','FULL POWER!!'],
-  },
-  {
-    id:'vegeta', name:'Vegeta', sprite:'vegeta', ssjSprite:null,
-    aura:'#8800ff', glow:'#aa00ff', speed:1.6, jumpH:180,
-    x:500, vx:-1.6, flipped:true,  state:'walk', timer:120,
-    isSSJ:false, y:0, vy:0, jumping:false,
-    quotes:['PRINCE OF SAIYANS!','OVER 9000!!','FINAL FLASH!!'],
-    fightQ:['FINAL FLASH!!','GALICK GUN!!','Prepare to die!'],
-    powerQ:['MY PRIDE...!','VEGETA WINS!!','FINAL BURST!!'],
-  },
-  {
-    id:'piccolo', name:'Piccolo', sprite:'piccolo', ssjSprite:null,
-    aura:'#00aa44', glow:'#004422', speed:1.2, jumpH:220,
-    x:900, vx:1.2,  flipped:false, state:'idle', timer:200,
-    isSSJ:false, y:0, vy:0, jumping:false,
-    quotes:['Special Beam Cannon!','Train harder.','MAKANKOSAPPO!!'],
-    fightQ:['HELLZONE GRENADE!!','Special Beam Cannon!!','FEEL MY POWER!'],
-    powerQ:['Unlimited power...','RISING KI!!','BREAK YOUR LIMITS!'],
-  },
-  {
-    id:'frieza', name:'Frieza', sprite:'frieza', ssjSprite:null,
-    aura:'#cc44ff', glow:'#880088', speed:1.3, jumpH:240,
-    x:1100,vx:-1.3, flipped:true,  state:'float', timer:180,
-    isSSJ:false, y:0, vy:0, jumping:false,
-    quotes:['Greatest in the universe!','DEATH BEAM!!','Pathetic fools...'],
-    fightQ:['DEATH BALL!!','SUPERNOVA!!','YOU ALL DIE!!'],
-    powerQ:['100% POWER!!','UNLIMITED MIGHT!!','TREMBLE!!'],
-  },
-  {
-    id:'gohan', name:'Gohan', sprite:'gohan', ssjSprite:null,
-    aura:'#ffd700', glow:'#ff6600', speed:1.5, jumpH:195,
-    x:300, vx:-1.5, flipped:true,  state:'walk', timer:110,
-    isSSJ:false, y:0, vy:0, jumping:false,
-    quotes:["It's over!","MASENKO!!",'THIS POWER...!'],
-    fightQ:['MASENKO HA!!','KAMEHAMEHA!!','I WONT LOSE!!'],
-    powerQ:['RAAAHHHHH!!!','SSJ2!!!','HIDDEN POWER!!!'],
-  },
-];
-
-const GRAV = 0.7;
-let els = {}, frame = 0;
-let imgCache = {};
-
-// Pre-render all sprites
-function prerender() {
-  Object.keys(SPRITES).forEach(k => { imgCache[k] = buildPixelChar(k, 5); });
-}
-
-// ── RENDER SINGLE CHARACTER ────────────────────────────────────────
-function buildCharEl(char) {
-  const wrap = document.createElement('div');
-  wrap.id = 'char-' + char.id;
-  wrap.className = 'char-wrap';
-  wrap.style.cssText = `left:${char.x}px; bottom:0; z-index:5;`;
-
-  // Aura
-  const aura = document.createElement('div');
-  aura.className = 'char-aura';
-  aura.style.cssText = `width:70px;height:20px;transform:translateX(-50%);background:${char.aura};`;
-  wrap.appendChild(aura);
-
-  // Left leg
-  const legL = document.createElement('div');
-  legL.className = 'leg-l';
-  legL.style.cssText = `position:absolute;bottom:10px;left:10px;width:10px;height:22px;background:transparent;transform-origin:top center;`;
-
-  // Right leg
-  const legR = document.createElement('div');
-  legR.className = 'leg-r';
-  legR.style.cssText = `position:absolute;bottom:10px;left:26px;width:10px;height:22px;background:transparent;transform-origin:top center;`;
-
-  // Body img
-  const img = document.createElement('img');
-  img.src = imgCache[char.sprite] || imgCache['goku'];
-  img.style.cssText = `display:block;width:60px;height:auto;image-rendering:pixelated;position:relative;z-index:2;filter:drop-shadow(0 0 6px ${char.aura});`;
-  img.draggable = false;
-  wrap.appendChild(img);
-
-  // Ki orb (for powerup state)
-  const kiOrb = document.createElement('div');
-  kiOrb.className = 'ki-orb';
-  kiOrb.style.cssText = `width:14px;height:14px;top:-18px;left:50%;transform:translateX(-50%);color:${char.aura};display:none;`;
-  wrap.appendChild(kiOrb);
-
-  // Speech bubble
-  const bubble = document.createElement('div');
-  bubble.className = 'speech-bubble';
-  bubble.id = 'bubble-' + char.id;
-  const tail = document.createElement('span');
-  bubble.appendChild(tail);
-  wrap.appendChild(bubble);
-
-  // Name tag
-  const name = document.createElement('div');
-  name.className = 'char-name';
-  name.textContent = char.name.toUpperCase();
-  name.style.color = char.aura;
-  name.style.textShadow = `0 0 8px ${char.aura}`;
-  wrap.appendChild(name);
-
-  wrap.addEventListener('click', e => {
-    e.stopPropagation();
-    doJump(char);
-    speak(char, char.quotes[Math.floor(Math.random()*char.quotes.length)]);
-    boom(char.x + 30, window.innerHeight - 80, char.aura);
-  });
-
-  return { wrap, img, aura, kiOrb, bubble };
-}
-
-function init() {
-  prerender();
-  const layer = document.getElementById('characters-layer');
-  if (!layer) return;
-  CHARS.forEach(char => {
-    const el = buildCharEl(char);
-    layer.appendChild(el.wrap);
-    els[char.id] = el;
-  });
-  requestAnimationFrame(loop);
-  setInterval(() => speak(CHARS[Math.floor(Math.random()*CHARS.length)]), 4000);
-  setInterval(doInteraction, 7500);
-  setInterval(doPowerUp, 12000);
-}
-
-function loop() {
-  frame++;
-  const W = window.innerWidth;
-
-  CHARS.forEach(char => {
-    const el = els[char.id];
-    if (!el) return;
-
-    // State tick
-    char.timer--;
-    if (char.timer <= 0) nextState(char);
-
-    // Physics
-    if (char.jumping) {
-      char.vy += GRAV;
-      char.y -= char.vy;
-      if (char.y <= 0) { char.y=0; char.jumping=false; char.vy=0; }
-    }
-
-    // Movement
-    if (char.state==='walk')  char.x += char.vx;
-    if (char.state==='run')   char.x += char.vx * 3;
-    if (char.state==='fight') char.x += char.vx * 1.2;
-    if (char.state==='float') {
-      char.x += char.vx * 0.6;
-      char.y = 25 + Math.sin(frame * 0.02) * 18;
-    }
-
-    // Boundary
-    if (char.x > W - 70) { char.x = W-70; char.vx = -Math.abs(char.vx); char.flipped = true; }
-    if (char.x < 5)       { char.x = 5;    char.vx =  Math.abs(char.vx); char.flipped = false; }
-
-    // Apply position
-    el.wrap.style.left = char.x + 'px';
-    el.wrap.style.bottom = Math.max(0, char.y) + 'px';
-    el.wrap.style.transform = char.flipped ? 'scaleX(-1)' : 'scaleX(1)';
-
-    // Leg animations based on state
-    const speed = char.state==='run' ? '0.2s' : char.state==='walk' ? '0.4s' : '0.8s';
-    const legAnim = (char.state==='walk'||char.state==='run') ? `legLeft ${speed} ease-in-out infinite alternate` : 'none';
-
-    // Image glow/filter per state
-    if (char.state==='powerup') {
-      el.img.style.filter = `drop-shadow(0 0 20px ${char.aura}) drop-shadow(0 0 40px ${char.glow}) brightness(1.5)`;
-      el.aura.style.width = '90px'; el.aura.style.height = '30px'; el.aura.style.opacity='0.9';
-      el.kiOrb.style.display = 'block';
-    } else if (char.state==='fight') {
-      el.img.style.filter = `drop-shadow(0 0 12px ${char.aura}) drop-shadow(0 2px 4px #000) brightness(1.2)`;
-      el.aura.style.width = '75px'; el.aura.style.height = '22px'; el.aura.style.opacity='0.7';
-      el.kiOrb.style.display = 'none';
-    } else {
-      el.img.style.filter = `drop-shadow(0 0 6px ${char.aura}) drop-shadow(0 2px 6px #000)`;
-      el.aura.style.width = '65px'; el.aura.style.height = '16px'; el.aura.style.opacity='0.5';
-      el.kiOrb.style.display = 'none';
-    }
-
-    // Walk bob animation on the whole wrap
-    if (char.state==='walk') {
-      el.wrap.style.animation = 'walkBob 0.4s ease-in-out infinite';
-    } else if (char.state==='run') {
-      el.wrap.style.animation = 'runBob 0.2s ease-in-out infinite';
-    } else if (char.state==='idle') {
-      el.wrap.style.animation = 'idleBreath 2s ease-in-out infinite';
-    } else if (char.state==='powerup') {
-      el.wrap.style.animation = 'powerUp 1.5s ease-in-out infinite';
-    } else if (char.state==='float') {
-      el.wrap.style.animation = 'floatUp 2s ease-in-out infinite';
-    } else {
-      el.wrap.style.animation = 'none';
-    }
-  });
-
-  requestAnimationFrame(loop);
-}
-
-function nextState(char) {
-  const r = Math.random();
-  if      (r < 0.28) { char.state='walk';  char.timer=100+Math.random()*150; }
-  else if (r < 0.40) { char.state='run';   char.timer=30+Math.random()*50; char.vx=(Math.random()>.5?1:-1)*char.speed; char.flipped=char.vx<0; }
-  else if (r < 0.55) { char.state='idle';  char.timer=80+Math.random()*120; }
-  else if (r < 0.65) { char.state='jump';  char.timer=60; doJump(char); char.state='walk'; }
-  else if (r < 0.78) { char.state='fight'; char.timer=50+Math.random()*60; }
-  else if (char.id==='frieza') { char.state='float'; char.timer=120+Math.random()*120; }
-  else { char.state='walk'; char.timer=100; }
-}
-
-function doJump(char) {
-  if (!char.jumping) { char.jumping=true; char.vy = -(char.jumpH * 0.18); }
-}
-
-function speak(char, text) {
-  text = text || char.quotes[Math.floor(Math.random()*char.quotes.length)];
-  const el = els[char.id];
-  if (!el) return;
-  // Clear old text node
-  while (el.bubble.firstChild && el.bubble.firstChild.nodeType===3) el.bubble.removeChild(el.bubble.firstChild);
-  const old = el.bubble.querySelector('.btxt');
-  if (old) old.remove();
-  const sp = document.createElement('span');
-  sp.className = 'btxt';
-  sp.textContent = text;
-  el.bubble.insertBefore(sp, el.bubble.firstChild);
-  el.bubble.style.opacity = '1';
-  setTimeout(() => { el.bubble.style.opacity='0'; }, 2200);
-}
-
-function doInteraction() {
-  if (CHARS.length < 2) return;
-  let a = Math.floor(Math.random()*CHARS.length);
-  let b = Math.floor(Math.random()*CHARS.length);
-  while (b===a) b = Math.floor(Math.random()*CHARS.length);
-  const from=CHARS[a], to=CHARS[b];
-  speak(from, from.fightQ[Math.floor(Math.random()*from.fightQ.length)]);
-  from.state='fight'; from.timer=70;
-  fireKiBlast(from, to);
-}
-
-function fireKiBlast(from, to) {
-  const el = document.createElement('div');
-  const sx = from.x+30, sy = window.innerHeight-100;
-  const ex = to.x+30,   ey = window.innerHeight-100;
-  el.style.cssText = `position:fixed;left:${sx}px;top:${sy}px;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle,#fff,${from.aura},transparent);box-shadow:0 0 16px ${from.aura};pointer-events:none;z-index:8;transform:translate(-50%,-50%);`;
-  document.body.appendChild(el);
-  const dx=ex-sx, dy=ey-sy, dist=Math.sqrt(dx*dx+dy*dy), dur=Math.max(220,dist*.65);
-  let t0=null;
-  (function step(ts){
-    if(!t0)t0=ts;
-    const p=Math.min(1,(ts-t0)/dur);
-    el.style.left=(sx+dx*p)+'px';
-    el.style.top=(sy+dy*p-100*Math.sin(Math.PI*p))+'px';
-    el.style.opacity=String(1-p*.3);
-    if(p<1){ requestAnimationFrame(step); }
-    else { boom(ex,ey,from.aura); el.remove(); speak(to, to.quotes[Math.floor(Math.random()*to.quotes.length)]); }
-  })(0);
-  requestAnimationFrame(step => { t0=null; (function f(ts){ if(!t0)t0=ts; const p=Math.min(1,(ts-t0)/dur); el.style.left=(sx+dx*p)+'px'; el.style.top=(sy+dy*p-100*Math.sin(Math.PI*p))+'px'; el.style.opacity=String(1-p*.3); if(p<1) requestAnimationFrame(f); else { boom(ex,ey,from.aura); el.remove(); speak(to, to.quotes[Math.floor(Math.random()*to.quotes.length)]); } })(ts); });
-}
-
-function boom(x, y, color) {
-  for (let i=0; i<6; i++) {
-    const e=document.createElement('div');
-    const s=20+Math.random()*30;
-    e.style.cssText = `position:fixed;left:${x+(Math.random()-.5)*50}px;top:${y+(Math.random()-.5)*40}px;width:${s}px;height:${s}px;border-radius:50%;background:radial-gradient(circle,#fff,${color},transparent);pointer-events:none;z-index:9;animation:explosion .55s ease-out forwards;animation-delay:${i*.04}s;`;
-    document.body.appendChild(e);
-    setTimeout(()=>e.remove(), 650);
-  }
-}
-
-function doPowerUp() {
-  const char = CHARS[Math.floor(Math.random()*CHARS.length)];
-  const el = els[char.id];
-  if (!el) return;
-  char.state='powerup'; char.timer=100;
-  speak(char, char.powerQ[Math.floor(Math.random()*char.powerQ.length)]);
-  boom(char.x+30, window.innerHeight-80, char.aura);
-  // Goku SSJ
-  if (char.id==='goku' && !char.isSSJ && Math.random()>.4) {
-    char.isSSJ=true;
-    el.img.src = imgCache['goku_ssj'];
-    el.aura.style.background='#ffd700';
-    setTimeout(() => { char.isSSJ=false; el.img.src=imgCache['goku']; el.aura.style.background=char.aura; }, 15000);
-  }
-}
-
-document.addEventListener('click', e => {
-  if (e.target.closest && e.target.closest('#characters-layer')) return;
-  const p=document.createElement('div');
-  p.className='ki-particle';
-  const s=10+Math.random()*12;
-  p.style.cssText=`left:${e.clientX-s/2}px;top:${e.clientY-s/2}px;width:${s}px;height:${s}px;`;
-  document.body.appendChild(p);
-  setTimeout(()=>p.remove(),600);
-});
-
-if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init);
-else setTimeout(init,80);
-window.dbzBoom=boom;
-})();
-"""
-
-# ─────────────────────────────────────────────────────────────────────
-# DBZ INTRO — fully self-contained, no external assets
-# ─────────────────────────────────────────────────────────────────────
-DBZ_INTRO = r"""
-<div id="dbz-intro" style="position:fixed;inset:0;z-index:99999;background:#000;font-family:'Bangers',cursive;overflow:hidden;">
-
-  <button id="intro-skip"
-    style="position:absolute;top:18px;right:18px;z-index:10;background:transparent;
-           border:1px solid rgba(255,106,0,.5);color:rgba(255,106,0,.8);
-           font-family:'Bangers',cursive;font-size:.9rem;letter-spacing:.15em;
-           padding:6px 16px;cursor:pointer;border-radius:2px;"
-    onclick="window.__dbzSkip && window.__dbzSkip()">
-    SKIP ▶
-  </button>
-
-  <!-- FLASH OVERLAY -->
-  <div id="iFlash" style="position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:5;"></div>
-
-  <!-- PHASE 1: POWER CHARGE -->
-  <div id="iCharge" style="position:absolute;inset:0;opacity:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,#1a0800,#000 70%);">
-    <canvas id="iLCanvas" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;"></canvas>
-
-    <div style="position:absolute;top:24px;right:24px;background:rgba(0,0,0,.85);border:2px solid #ff6a00;padding:8px 16px;border-radius:3px;box-shadow:0 0 20px rgba(255,106,0,.4);">
-      <div style="font-size:.55rem;color:#c8a878;letter-spacing:.3em;margin-bottom:2px;">POWER LEVEL</div>
-      <div id="iPL" style="font-size:2rem;color:#ffd700;letter-spacing:.05em;">000000</div>
-    </div>
-
-    <div style="position:absolute;top:24px;left:24px;font-family:'Share Tech Mono',monospace;font-size:.7rem;color:#00ff44;opacity:0;" id="iScout">SCOUTING...</div>
-
-    <div id="iAura" style="position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:60px;height:0;background:linear-gradient(0deg,#ffd700,#ff6a00,transparent);filter:blur(10px);opacity:0;border-radius:50% 50% 0 0;"></div>
-
-    <div id="iShockWrap" style="position:absolute;bottom:30px;left:50%;transform:translateX(-50%);width:0;height:0;pointer-events:none;">
-    </div>
-
-    <!-- Pixel Goku silhouette (CSS only) -->
-    <div id="iSil" style="position:absolute;bottom:50px;left:50%;transform:translateX(-50%);opacity:0;">
-      <canvas id="iSilCanvas" width="96" height="160" style="image-rendering:pixelated;filter:brightness(0) saturate(0) invert(1) sepia(1) saturate(5) hue-rotate(5deg);"></canvas>
-    </div>
-
-    <div id="iScream" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.5);font-size:clamp(2.5rem,8vw,6rem);letter-spacing:.08em;opacity:0;background:linear-gradient(135deg,#fff,#ffd700,#ff6a00);-webkit-background-clip:text;-webkit-text-fill-color:transparent;white-space:nowrap;text-align:center;transition:transform .2s,opacity .15s;">
-      AAAAHHHHH!!!
-    </div>
-  </div>
-
-  <!-- PHASE 2: TITLE -->
-  <div id="iTitle" style="position:absolute;inset:0;opacity:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,#0d0400,#000 80%);">
-    <canvas id="iSpeedCanvas" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:0.35;"></canvas>
-
-    <div id="iDBalls" style="display:flex;gap:14px;margin-bottom:20px;opacity:0;">
-    </div>
-
-    <div id="iTitleText" style="font-size:clamp(2.5rem,10vw,7rem);letter-spacing:.08em;line-height:.95;text-align:center;opacity:0;transform:scale(3);background:linear-gradient(135deg,#fff 0%,#ffd700 35%,#ff6a00 65%,#ff1a1a 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 25px #ff6a0088);">
-      CTF
-    </div>
-
-    <div id="iSub" style="font-size:clamp(.75rem,2vw,1.1rem);letter-spacing:.4em;color:#ff6a00;margin-top:14px;opacity:0;">⚡ CAPTURE THE FLAG ⚡</div>
-
-    <div id="iBarWrap" style="margin-top:28px;width:min(380px,80vw);opacity:0;">
-      <div style="font-size:.6rem;color:#c8a878;letter-spacing:.3em;margin-bottom:5px;text-align:center;">LOADING BATTLE DATA...</div>
-      <div style="background:rgba(255,106,0,.15);border:1px solid rgba(255,106,0,.4);border-radius:2px;height:7px;overflow:hidden;">
-        <div id="iBar" style="height:100%;width:0%;background:linear-gradient(90deg,#ff6a00,#ffd700);box-shadow:0 0 8px #ffd700;transition:width .04s linear;"></div>
-      </div>
-    </div>
-
-    <button id="iEnterBtn" onclick="window.__dbzSkip && window.__dbzSkip()"
-      style="display:none;margin-top:28px;padding:12px 44px;font-family:'Bangers',cursive;font-size:1.3rem;letter-spacing:.18em;border:2px solid #ffd700;background:linear-gradient(135deg,rgba(255,215,0,.18),rgba(255,106,0,.08));color:#ffd700;cursor:pointer;border-radius:2px;animation:enterpulse 1.4s ease-in-out infinite;">
-      ⚡ ENTER THE BATTLE ⚡
-    </button>
-  </div>
-
-  <!-- PHASE 3: CHARACTER PARADE -->
-  <div id="iParade" style="position:absolute;inset:0;opacity:0;background:#000;overflow:hidden;">
-    <canvas id="iParadeCanvas" style="position:absolute;inset:0;width:100%;height:100%;opacity:0.4;"></canvas>
-
-    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;">
-      <canvas id="iCharCanvas" width="120" height="200" style="image-rendering:pixelated;display:block;margin:0 auto;transform:scale(0);transition:transform .35s cubic-bezier(.34,1.56,.64,1);filter:drop-shadow(0 0 20px #ffd700);"></canvas>
-      <div id="iCharName" style="font-size:clamp(2rem,6vw,3.5rem);letter-spacing:.15em;color:#ffd700;margin-top:8px;opacity:0;transform:translateY(16px);transition:all .35s ease;"></div>
-      <div id="iCharQuote" style="font-size:clamp(.85rem,2vw,1.2rem);letter-spacing:.08em;color:#ff6a00;margin-top:4px;opacity:0;transform:translateY(8px);transition:all .3s ease .1s;"></div>
-    </div>
-
-    <div id="iVsFlash" style="position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;"></div>
-  </div>
-
-</div>
-
-<style>
-@keyframes enterpulse{0%,100%{box-shadow:0 0 16px rgba(255,215,0,.3),0 0 32px rgba(255,106,0,.15)}50%{box-shadow:0 0 32px rgba(255,215,0,.6),0 0 64px rgba(255,106,0,.35)}}
-@keyframes dballspin{0%{box-shadow:0 0 8px rgba(255,215,0,.4)}50%{box-shadow:0 0 20px rgba(255,215,0,.9),0 0 40px rgba(255,106,0,.4)}100%{box-shadow:0 0 8px rgba(255,215,0,.4)}}
-</style>
-
-<script>
-(function(){
-
-// ── ONLY PLAY ONCE PER SESSION ──
-if(sessionStorage.getItem('dbz_done')){
-  document.getElementById('dbz-intro').style.display='none';
-  return;
-}
-
-// ── Pixel palette + sprite (same as PIXEL_CHARS_JS) ──
-const PAL2={W:'#fff',SK:'#f5c97a',SK2:'#e8a85a',DK:'#1a0800',BK:'#111',OR:'#ff6a00',YL:'#ffd700',RD:'#ff2200',BL:'#1a44cc',PU:'#7700cc',GR:'#116611',GY:'#888',LG:'#22aa33',PK:'#ff44cc',WH:'#eeeeff',NV:'#001166',OG:'#ff8800',TL:'#00bbaa',SL:'#ccccdd',CY:'#00ddff'};
-
-const GOKU_GRID=[
-  [0,0,'BK','BK','BK','BK','BK','BK','BK',0,0,0],
-  [0,'BK','BK','BK','BK','BK','BK','BK','BK','BK',0,0],
-  ['BK','BK','BK','SK','SK','SK','SK','SK','BK','BK','BK',0],
-  [0,'BK','SK','SK','SK','SK','SK','SK','SK','BK',0,0],
-  [0,'SK','SK','W','BK','SK','W','BK','SK','SK',0,0],
-  [0,'SK','SK','SK','SK','SK','SK','SK','SK','SK',0,0],
-  [0,'SK','SK','SK','OR','SK','SK','OR','SK','SK',0,0],
-  [0,0,'SK','SK','SK','SK','SK','SK','SK',0,0,0],
-  [0,0,0,'SK','SK','SK','SK','SK',0,0,0,0],
-  [0,'OR','OR','OR','OR','OR','OR','OR','OR','OR',0,0],
-  [0,'OR','BL','OR','OR','OR','OR','OR','BL','OR',0,0],
-  ['OR','OR','OR','OR','OR','OR','OR','OR','OR','OR','OR',0],
-  [0,'BL','BL','BL','BL','BL','BL','BL','BL','BL',0,0],
-  [0,'BL','BL','OR','BL','BL','BL','OR','BL','BL',0,0],
-  [0,'BL','BL','OR','BL','BL','BL','OR','BL','BL',0,0],
-  [0,'BL','BL','OR','BL','BL','BL','OR','BL','BL',0,0],
-  [0,0,'OR','OR','BL',0,0,'BL','OR','OR',0,0],
-  [0,0,'OR','OR','BL',0,0,'BL','OR','OR',0,0],
-  [0,0,'RD','RD','RD',0,0,'RD','RD','RD',0,0],
-  [0,0,'RD','RD','RD',0,0,'RD','RD','RD',0,0],
-];
-
-const CHARS_PARADE=[
-  {name:'GOKU',    grid:GOKU_GRID,             aura:'#ffd700',quote:'"KAMEHAMEHA!!"'},
-  {name:'VEGETA',  grid:null, aura:'#8800ff', quote:'"OVER 9000!!"'},
-  {name:'PICCOLO', grid:null, aura:'#00aa44', quote:'"SPECIAL BEAM CANNON!!"'},
-  {name:'GOHAN',   grid:null, aura:'#ffd700', quote:'"THIS POWER...!"'},
-  {name:'FRIEZA',  grid:null, aura:'#cc44ff', quote:'"KNEEL BEFORE ME!!"'},
-];
-
-// Vegeta grid
-const VG=[
-  [0,'BK','BK','BK','BK','BK','BK','BK','BK','BK',0,0],
-  ['BK','BK','BK','BK','BK','BK','BK','BK','BK','BK','BK',0],
-  ['BK','BK','BK','SK','SK','SK','SK','SK','BK','BK','BK',0],
-  [0,'BK','SK','SK','SK','SK','SK','SK','SK','BK',0,0],
-  [0,'SK','SK','W','BK','SK','W','BK','SK','SK',0,0],
-  [0,'SK','SK','SK','SK','SK','SK','SK','SK','SK',0,0],
-  [0,'SK','SK','SK',0,'SK','SK',0,'SK','SK',0,0],
-  [0,0,'SK','SK','SK','SK','SK','SK','SK',0,0,0],
-  [0,0,0,'SK','SK','SK','SK','SK',0,0,0,0],
-  [0,'WH','WH','WH','WH','WH','WH','WH','WH','WH',0,0],
-  [0,'WH','YL','WH','WH','WH','WH','WH','YL','WH',0,0],
-  ['WH','WH','WH','WH','WH','WH','WH','WH','WH','WH','WH',0],
-  [0,'BK','BK','BK','BK','BK','BK','BK','BK','BK',0,0],
-  [0,'NV','NV','WH','NV','NV','NV','WH','NV','NV',0,0],
-  [0,'NV','NV','WH','NV','NV','NV','WH','NV','NV',0,0],
-  [0,'NV','NV','WH','NV','NV','NV','WH','NV','NV',0,0],
-  [0,0,'NV','NV','NV',0,0,'NV','NV','NV',0,0],
-  [0,0,'NV','NV','NV',0,0,'NV','NV','NV',0,0],
-  [0,0,'WH','WH','WH',0,0,'WH','WH','WH',0,0],
-  [0,0,'WH','WH','WH',0,0,'WH','WH','WH',0,0],
-];
-const PIC=[
   [0,0,0,'LG','LG',0,0,'LG','LG',0,0,0],
   [0,0,0,'LG','LG',0,0,'LG','LG',0,0,0],
   [0,0,'LG','LG','LG','LG','LG','LG','LG','LG',0,0],
@@ -783,30 +338,9 @@ const PIC=[
   [0,0,'PU','PU','PU',0,0,'PU','PU','PU',0,0],
   [0,0,'WH','WH','WH',0,0,'WH','WH','WH',0,0],
   [0,0,'WH','WH','WH',0,0,'WH','WH','WH',0,0],
-];
-const GH=[
-  [0,0,'BK','BK','BK','BK','BK','BK',0,0,0,0],
-  [0,'BK','BK','BK','BK','BK','BK','BK','BK','BK',0,0],
-  ['BK','BK','BK','SK','SK','SK','SK','SK','BK','BK',0,0],
-  [0,'BK','SK','SK','SK','SK','SK','SK','SK','BK',0,0],
-  [0,'SK','SK','W','BK','SK','W','BK','SK','SK',0,0],
-  [0,'SK','SK','SK','SK','SK','SK','SK','SK','SK',0,0],
-  [0,'SK','SK','SK',0,'SK','SK',0,'SK','SK',0,0],
-  [0,0,'SK','SK','SK','SK','SK','SK','SK',0,0,0],
-  [0,0,0,'SK','SK','SK','SK','SK',0,0,0,0],
-  [0,'PU','PU','PU','PU','PU','PU','PU','PU','PU',0,0],
-  [0,'PU','YL','PU','PU','PU','PU','PU','YL','PU',0,0],
-  ['PU','PU','PU','PU','PU','PU','PU','PU','PU','PU','PU',0],
-  [0,'YL','YL','YL','YL','YL','YL','YL','YL','YL',0,0],
-  [0,'BL','BL','YL','BL','BL','BL','YL','BL','BL',0,0],
-  [0,'BL','BL','YL','BL','BL','BL','YL','BL','BL',0,0],
-  [0,'BL','BL','YL','BL','BL','BL','YL','BL','BL',0,0],
-  [0,0,'BL','BL','BL',0,0,'BL','BL','BL',0,0],
-  [0,0,'BL','BL','BL',0,0,'BL','BL','BL',0,0],
-  [0,0,'BK','BK','BK',0,0,'BK','BK','BK',0,0],
-  [0,0,'BK','BK','BK',0,0,'BK','BK','BK',0,0],
-];
-const FZ=[
+],
+
+frieza:[
   [0,0,'WH','WH','WH','WH','WH','WH','WH',0,0,0],
   [0,'WH','WH','WH','WH','WH','WH','WH','WH','WH',0,0],
   [0,'WH','PU','WH','WH','WH','WH','WH','PU','WH',0,0],
@@ -827,352 +361,316 @@ const FZ=[
   [0,0,'WH','WH','WH',0,0,'WH','WH','WH',0,0],
   [0,0,'PU','PU','PU',0,0,'PU','PU','PU',0,0],
   [0,0,'PU','PU','PU',0,0,'PU','PU','PU',0,0],
-];
-CHARS_PARADE[1].grid=VG;
-CHARS_PARADE[2].grid=PIC;
-CHARS_PARADE[3].grid=GH;
-CHARS_PARADE[4].grid=FZ;
+],
 
-function drawGrid(canvas, grid, scale) {
-  const ctx = canvas.getContext('2d');
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  grid.forEach((row,r)=>{
-    row.forEach((v,c)=>{
-      if(!v||v===0) return;
-      ctx.fillStyle = PAL2[v]||v;
-      ctx.fillRect(c*scale, r*scale, scale, scale);
-    });
-  });
-}
-
-// ── LIGHTNING ──
-function drawLightning(canvas, color, n) {
-  const ctx = canvas.getContext('2d');
-  canvas.width = canvas.offsetWidth||window.innerWidth;
-  canvas.height = canvas.offsetHeight||window.innerHeight;
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  const cx=canvas.width/2, cy=canvas.height*.6;
-  for(let i=0;i<n;i++){
-    ctx.beginPath(); ctx.strokeStyle=color;
-    ctx.lineWidth=Math.random()*2+.5; ctx.globalAlpha=Math.random()*.7+.2;
-    let x=cx+(Math.random()-.5)*180, y=cy+(Math.random()-.5)*180;
-    ctx.moveTo(x,y);
-    for(let j=0;j<5;j++){x+=(Math.random()-.5)*110;y+=(Math.random()-.5)*110;ctx.lineTo(x,y);}
-    ctx.stroke();
-  }
-  ctx.globalAlpha=1;
-}
-
-// ── SPEED LINES ──
-function drawSpeed(canvas) {
-  const ctx = canvas.getContext('2d');
-  canvas.width=canvas.offsetWidth||window.innerWidth;
-  canvas.height=canvas.offsetHeight||window.innerHeight;
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  const cx=canvas.width/2, cy=canvas.height/2;
-  for(let i=0;i<70;i++){
-    const a=(i/70)*Math.PI*2;
-    const inner=50+Math.random()*30;
-    const outer=Math.max(canvas.width,canvas.height)*1.2;
-    ctx.beginPath();
-    ctx.strokeStyle=i%3===0?'#ffd700':i%3===1?'#ff6a00':'#ffffff33';
-    ctx.lineWidth=Math.random()*2.5+.3;
-    ctx.globalAlpha=.25+Math.random()*.25;
-    ctx.moveTo(cx+Math.cos(a)*inner,cy+Math.sin(a)*inner);
-    ctx.lineTo(cx+Math.cos(a)*outer,cy+Math.sin(a)*outer);
-    ctx.stroke();
-  }
-  ctx.globalAlpha=1;
-}
-
-function drawParadeLines(canvas,color,t){
-  const ctx=canvas.getContext('2d');
-  canvas.width=canvas.offsetWidth||window.innerWidth;
-  canvas.height=canvas.offsetHeight||window.innerHeight;
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  const cx=canvas.width/2;
-  for(let i=0;i<55;i++){
-    const a=(i/55)*Math.PI*2+t;
-    const inner=60;
-    const outer=550+Math.sin(t*3+i)*80;
-    ctx.beginPath(); ctx.strokeStyle=i%2===0?color:'#ffffff18';
-    ctx.lineWidth=Math.random()*1.8+.3;
-    ctx.globalAlpha=.25+Math.sin(t*2+i)*.12;
-    ctx.moveTo(cx+Math.cos(a)*inner, canvas.height*.35+Math.sin(a)*inner*.3);
-    ctx.lineTo(cx+Math.cos(a)*outer, canvas.height*.35+Math.sin(a)*outer*.3);
-    ctx.stroke();
-  }
-  ctx.globalAlpha=1;
-}
-
-// ── DRAGON BALLS ──
-function makeDball(size){
-  const c=document.createElement('canvas'); c.width=size; c.height=size;
-  const ctx=c.getContext('2d');
-  const g=ctx.createRadialGradient(size*.35,size*.35,0,size*.5,size*.5,size*.5);
-  g.addColorStop(0,'#fffcdd'); g.addColorStop(.4,'#ffd700'); g.addColorStop(.8,'#ff6a00'); g.addColorStop(1,'#8b4500');
-  ctx.beginPath(); ctx.arc(size/2,size/2,size/2,0,Math.PI*2); ctx.fillStyle=g; ctx.fill();
-  ctx.fillStyle='#cc3300';
-  [[.5,.38],[.38,.5],[.62,.5],[.5,.62],[.38,.38],[.62,.62],[.5,.5]].forEach(([x,y],i)=>{
-    ctx.beginPath(); ctx.arc(x*size,y*size,size*.07,0,Math.PI*2);
-    if(i<7)ctx.fill();
-  });
-  return c.toDataURL();
-}
-
-const sleep = ms => new Promise(r=>setTimeout(r,ms));
-let running = true;
-
-window.__dbzSkip = function(){
-  running=false;
-  const intro=document.getElementById('dbz-intro');
-  intro.style.transition='opacity .4s'; intro.style.opacity='0';
-  setTimeout(()=>{ intro.style.display='none'; sessionStorage.setItem('dbz_done','1'); },400);
+gohan:[
+  [0,0,'BK','BK','BK','BK','BK','BK',0,0,0,0],
+  [0,'BK','BK','BK','BK','BK','BK','BK','BK','BK',0,0],
+  ['BK','BK','BK','SK','SK','SK','SK','SK','BK','BK',0,0],
+  [0,'BK','SK','SK','SK','SK','SK','SK','SK','BK',0,0],
+  [0,'SK','SK','W','BK','SK','W','BK','SK','SK',0,0],
+  [0,'SK','SK','SK','SK','SK','SK','SK','SK','SK',0,0],
+  [0,'SK','SK','SK',0,'SK','SK',0,'SK','SK',0,0],
+  [0,0,'SK','SK','SK','SK','SK','SK','SK',0,0,0],
+  [0,0,0,'SK','SK','SK','SK','SK',0,0,0,0],
+  [0,'PU','PU','PU','PU','PU','PU','PU','PU','PU',0,0],
+  [0,'PU','YL','PU','PU','PU','PU','PU','YL','PU',0,0],
+  ['PU','PU','PU','PU','PU','PU','PU','PU','PU','PU','PU',0],
+  [0,'YL','YL','YL','YL','YL','YL','YL','YL','YL',0,0],
+  [0,'BL','BL','YL','BL','BL','BL','YL','BL','BL',0,0],
+  [0,'BL','BL','YL','BL','BL','BL','YL','BL','BL',0,0],
+  [0,'BL','BL','YL','BL','BL','BL','YL','BL','BL',0,0],
+  [0,0,'BL','BL','BL',0,0,'BL','BL','BL',0,0],
+  [0,0,'BL','BL','BL',0,0,'BL','BL','BL',0,0],
+  [0,0,'BK','BK','BK',0,0,'BK','BK','BK',0,0],
+  [0,0,'BK','BK','BK',0,0,'BK','BK','BK',0,0],
+],
 };
 
-async function run(){
-  const iFlash=document.getElementById('iFlash');
-  const iCharge=document.getElementById('iCharge');
-  const iTitle=document.getElementById('iTitle');
-  const iParade=document.getElementById('iParade');
+const GRAV = 0.7;
+let els = {}, frame = 0;
+let imgCache = {};
 
-  const fade=(el,o,d=300)=>new Promise(r=>{
-    el.style.transition=`opacity ${d}ms`;
-    el.style.opacity=o;
-    setTimeout(r,d+20);
-  });
-
-  // ── PHASE 0: Flash ──
-  await sleep(150);
-  if(!running)return;
-  await fade(iFlash,1,60); await fade(iFlash,0,60);
-  await sleep(80);
-  await fade(iFlash,1,50); await fade(iFlash,0,80);
-
-  // ── PHASE 1: Energy Charge ──
-  if(!running)return;
-  await fade(iCharge,1,300);
-
-  const scout=document.getElementById('iScout');
-  scout.style.transition='opacity .3s'; scout.style.opacity='1';
-
-  // Power level count
-  const plEl=document.getElementById('iPL');
-  let plVal=0, plTarget=530000;
-  const plInterval=setInterval(()=>{
-    if(!running){clearInterval(plInterval);return;}
-    plVal=Math.min(plVal+Math.floor(plTarget/120)+1000,plTarget);
-    plEl.textContent=String(plVal).padStart(6,'0');
-    if(plVal>=plTarget)clearInterval(plInterval);
-  },20);
-
-  // Aura rise
-  const iAura=document.getElementById('iAura');
-  iAura.style.transition='height 2s ease-out,opacity .3s';
-  iAura.style.opacity='0.9';
-  setTimeout(()=>{iAura.style.height='70vh';},50);
-
-  // Pixel silhouette
-  const silCanvas=document.getElementById('iSilCanvas');
-  silCanvas.width=120; silCanvas.height=160;
-  drawGrid(silCanvas,GOKU_GRID,10);
-  const iSil=document.getElementById('iSil');
-  await sleep(500);
-  if(!running)return;
-  iSil.style.transition='opacity .4s'; iSil.style.opacity='1';
-
-  // Shockwaves
-  const shockWrap=document.getElementById('iShockWrap');
-  [['#ff6a00',600,0],['#ffd700',800,150],['#ffffff88',1000,300]].forEach(([col,size,delay])=>{
-    setTimeout(()=>{
-      const s=document.createElement('div');
-      s.style.cssText=`position:absolute;left:50%;top:50%;border-radius:50%;border:3px solid ${col};width:0;height:0;margin-left:0;margin-top:0;opacity:1;transition:all 700ms ease-out;`;
-      shockWrap.appendChild(s);
-      setTimeout(()=>{
-        s.style.width=size+'px'; s.style.height=Math.round(size*.35)+'px';
-        s.style.marginLeft=-(size/2)+'px'; s.style.marginTop=-(size*.175)+'px';
-        s.style.opacity='0';
-      },30);
-      setTimeout(()=>s.remove(),800);
-    },delay);
-  });
-
-  // Lightning
-  await sleep(600);
-  if(!running)return;
-  const lc=document.getElementById('iLCanvas');
-  lc.style.transition='opacity .2s'; lc.style.opacity='0.8';
-  let lTick=0;
-  const lInterval=setInterval(()=>{
-    if(!running){clearInterval(lInterval);return;}
-    drawLightning(lc,lTick%2===0?'#ffd700':'#fff',7);
-    if(++lTick>18)clearInterval(lInterval);
-  },100);
-
-  // Scream
-  await sleep(400);
-  if(!running)return;
-  const scr=document.getElementById('iScream');
-  scr.style.opacity='1'; scr.style.transform='translate(-50%,-50%) scale(1)';
-  await sleep(180); scr.style.transform='translate(-50%,-50%) scale(1.12)';
-  await sleep(180); scr.style.transform='translate(-50%,-50%) scale(0.97)';
-
-  // Scouter breaks
-  await sleep(350);
-  if(!running)return;
-  scout.textContent="IT'S OVER 9000!!";
-  scout.style.color='#ff0000'; scout.style.fontSize='1rem';
-
-  await sleep(700);
-  if(!running)return;
-
-  // Flash transition
-  await fade(iFlash,1,70);
-  iCharge.style.opacity='0';
-  await fade(iFlash,0,80);
-
-  // ── PHASE 2: Title ──
-  if(!running)return;
-  await fade(iTitle,1,350);
-
-  // Speed lines
-  const sc=document.getElementById('iSpeedCanvas');
-  drawSpeed(sc);
-
-  // Dragon balls
-  const dbWrap=document.getElementById('iDBalls');
-  const dbImg=makeDball(30);
-  for(let i=0;i<7;i++){
-    const img=document.createElement('img');
-    img.src=dbImg; img.width=30; img.height=30;
-    img.style.cssText=`border-radius:50%;box-shadow:0 0 10px rgba(255,215,0,.5);animation:dballspin 2s ease-in-out ${i*.12}s infinite;transform:translateY(-30px);opacity:0;transition:transform .45s cubic-bezier(.34,1.56,.64,1) ${i*.08}s, opacity .3s ${i*.08}s;`;
-    dbWrap.appendChild(img);
+function buildPixelChar(spriteKey, scale=5) {
+  const grid = SPRITES[spriteKey];
+  const cols = 12, rows = 20;
+  const W = cols * scale, H = rows * scale;
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" shape-rendering="crispEdges">`;
+  for (let r=0; r<rows; r++) {
+    for (let c=0; c<cols; c++) {
+      const v = grid[r][c];
+      if (!v || v === 0) continue;
+      const col = PAL[v] || v;
+      svg += `<rect x="${c*scale}" y="${r*scale}" width="${scale}" height="${scale}" fill="${col}"/>`;
+    }
   }
-  dbWrap.style.transition='opacity .2s'; dbWrap.style.opacity='1';
-  await sleep(50);
-  dbWrap.querySelectorAll('img').forEach(img=>{ img.style.transform='translateY(0)'; img.style.opacity='1'; });
-
-  await sleep(500);
-  if(!running)return;
-
-  // Title slam
-  const tEl=document.getElementById('iTitleText');
-  const pgTitle=document.title.replace(/\s*-.*$/,'').trim()||'CTF';
-  tEl.textContent=pgTitle;
-  tEl.style.transition='none'; tEl.style.opacity='0'; tEl.style.transform='scale(4)';
-  await sleep(30);
-  tEl.style.transition='all .3s cubic-bezier(.34,1.56,.64,1)';
-  tEl.style.opacity='1'; tEl.style.transform='scale(1)';
-
-  // Screen shake
-  const intro=document.getElementById('dbz-intro');
-  ['-4px,2px','4px,-3px','-2px,3px','1px,-1px','0,0'].forEach((t,i)=>{
-    setTimeout(()=>{const[x,y]=t.split(',');intro.style.transform=`translate(${x},${y})`;},i*45);
-  });
-
-  await sleep(280);
-  if(!running)return;
-
-  const sub=document.getElementById('iSub');
-  sub.style.transition='opacity .4s,transform .4s'; sub.style.opacity='1'; sub.style.transform='translateY(0)';
-
-  // Loading bar
-  await sleep(200);
-  if(!running)return;
-  const bWrap=document.getElementById('iBarWrap');
-  bWrap.style.transition='opacity .3s'; bWrap.style.opacity='1';
-  const bar=document.getElementById('iBar');
-  let bp=0;
-  const barInterval=setInterval(()=>{
-    if(!running){clearInterval(barInterval);return;}
-    bp=Math.min(100,bp+2);
-    bar.style.width=bp+'%';
-    if(bp>=100)clearInterval(barInterval);
-  },28);
-
-  await sleep(1700);
-  if(!running)return;
-
-  // Flash to parade
-  await fade(iFlash,1,70);
-  iTitle.style.opacity='0';
-  await fade(iFlash,0,80);
-
-  // ── PHASE 3: Character Parade ──
-  if(!running)return;
-  await fade(iParade,1,300);
-
-  let parT=0;
-  const pCanvas=document.getElementById('iParadeCanvas');
-  let parAF=null;
-  function paradeLoop(){
-    if(!running)return;
-    drawParadeLines(pCanvas,CHARS_PARADE[Math.min(charIdx,CHARS_PARADE.length-1)].aura+'88',parT);
-    parT+=0.04;
-    parAF=requestAnimationFrame(paradeLoop);
-  }
-  let charIdx=0;
-  paradeLoop();
-
-  const cCanvas=document.getElementById('iCharCanvas');
-  cCanvas.width=120; cCanvas.height=160;
-  const cName=document.getElementById('iCharName');
-  const cQuote=document.getElementById('iCharQuote');
-  const vsFlash=document.getElementById('iVsFlash');
-
-  for(charIdx=0;charIdx<CHARS_PARADE.length;charIdx++){
-    if(!running)break;
-    const cd=CHARS_PARADE[charIdx];
-    // Reset
-    cCanvas.style.transform='scale(0)';
-    cName.style.opacity='0'; cName.style.transform='translateY(16px)';
-    cQuote.style.opacity='0'; cQuote.style.transform='translateY(8px)';
-    vsFlash.style.opacity='0';
-
-    await sleep(80);
-    if(!running)break;
-
-    drawGrid(cCanvas,cd.grid,10);
-    cName.textContent=cd.name;
-    cName.style.color=cd.aura;
-    cName.style.textShadow=`0 0 20px ${cd.aura}`;
-    cQuote.textContent=cd.quote;
-    cCanvas.style.filter=`drop-shadow(0 0 20px ${cd.aura}) drop-shadow(0 0 40px ${cd.aura}88)`;
-
-    cCanvas.style.transform='scale(1)';
-    await sleep(350);
-    if(!running)break;
-    cName.style.opacity='1'; cName.style.transform='translateY(0)';
-    await sleep(280);
-    if(!running)break;
-    cQuote.style.opacity='1'; cQuote.style.transform='translateY(0)';
-
-    // Flash
-    await sleep(120);
-    if(!running)break;
-    vsFlash.style.transition='opacity .08s'; vsFlash.style.background=`radial-gradient(ellipse at center,rgba(255,255,255,.88),${cd.aura}66,transparent 60%)`;
-    vsFlash.style.opacity='0.6';
-    await sleep(80); vsFlash.style.transition='opacity .35s'; vsFlash.style.opacity='0';
-    await sleep(charIdx<CHARS_PARADE.length-1?1200:600);
-  }
-
-  if(parAF) cancelAnimationFrame(parAF);
-  if(!running)return;
-
-  // Final: show enter button
-  await fade(iFlash,1,80);
-  iParade.style.opacity='0';
-  await fade(iFlash,0,80);
-  iTitle.style.opacity='1';
-  const enterBtn=document.getElementById('iEnterBtn');
-  const barWrapEl=document.getElementById('iBarWrap');
-  if(enterBtn) enterBtn.style.display='block';
-  if(barWrapEl) barWrapEl.style.display='none';
-
-  // Auto-dismiss after 4s
-  setTimeout(()=>{ if(running && window.__dbzSkip) window.__dbzSkip(); },4000);
+  svg += '</svg>';
+  return 'data:image/svg+xml;base64,' + btoa(svg);
 }
 
+const CHARS = [
+  { id:'goku', name:'Goku', sprite:'goku', ssjSprite:'goku_ssj', aura:'#ffd700', glow:'#ff6a00', speed:1.4, jumpH:200, x:80, vx:1.4, flipped:false, state:'walk', timer:100, isSSJ:false, y:0, vy:0, jumping:false, quotes:['KAMEHAMEHA!!','I need to get stronger!','KAIO-KEN x10!'], fightQ:['KAMEHAMEHA!!','KAIO-KEN!!','This ends NOW!'], powerQ:["I'M GOING SUPER SAIYAN!",'AAAAHHHH!!!','FULL POWER!!'] },
+  { id:'vegeta', name:'Vegeta', sprite:'vegeta', ssjSprite:null, aura:'#8800ff', glow:'#aa00ff', speed:1.6, jumpH:180, x:500, vx:-1.6, flipped:true, state:'walk', timer:120, isSSJ:false, y:0, vy:0, jumping:false, quotes:['PRINCE OF SAIYANS!','OVER 9000!!','FINAL FLASH!!'], fightQ:['FINAL FLASH!!','GALICK GUN!!','Prepare to die!'], powerQ:['MY PRIDE...!','VEGETA WINS!!','FINAL BURST!!'] },
+  { id:'piccolo', name:'Piccolo', sprite:'piccolo', ssjSprite:null, aura:'#00aa44', glow:'#004422', speed:1.2, jumpH:220, x:900, vx:1.2, flipped:false, state:'idle', timer:200, isSSJ:false, y:0, vy:0, jumping:false, quotes:['Special Beam Cannon!','Train harder.','MAKANKOSAPPO!!'], fightQ:['HELLZONE GRENADE!!','Special Beam Cannon!!','FEEL MY POWER!'], powerQ:['Unlimited power...','RISING KI!!','BREAK YOUR LIMITS!'] },
+  { id:'frieza', name:'Frieza', sprite:'frieza', ssjSprite:null, aura:'#cc44ff', glow:'#880088', speed:1.3, jumpH:240, x:1100, vx:-1.3, flipped:true, state:'float', timer:180, isSSJ:false, y:0, vy:0, jumping:false, quotes:['Greatest in the universe!','DEATH BEAM!!','Pathetic fools...'], fightQ:['DEATH BALL!!','SUPERNOVA!!','YOU ALL DIE!!'], powerQ:['100% POWER!!','UNLIMITED MIGHT!!','TREMBLE!!'] },
+  { id:'gohan', name:'Gohan', sprite:'gohan', ssjSprite:null, aura:'#ffd700', glow:'#ff6600', speed:1.5, jumpH:195, x:300, vx:-1.5, flipped:true, state:'walk', timer:110, isSSJ:false, y:0, vy:0, jumping:false, quotes:["It's over!","MASENKO!!",'THIS POWER...!'], fightQ:['MASENKO HA!!','KAMEHAMEHA!!','I WONT LOSE!!'], powerQ:['RAAAHHHHH!!!','SSJ2!!!','HIDDEN POWER!!!'] },
+];
+
+function prerender() { Object.keys(SPRITES).forEach(k => { imgCache[k] = buildPixelChar(k, 5); }); }
+
+function buildCharEl(char) {
+  const wrap = document.createElement('div');
+  wrap.id = 'char-' + char.id;
+  wrap.className = 'char-wrap';
+  wrap.style.cssText = `left:${char.x}px; bottom:0; z-index:5;`;
+  const aura = document.createElement('div');
+  aura.className = 'char-aura';
+  aura.style.cssText = `width:70px;height:20px;transform:translateX(-50%);background:${char.aura};`;
+  wrap.appendChild(aura);
+  const img = document.createElement('img');
+  img.src = imgCache[char.sprite] || imgCache['goku'];
+  img.style.cssText = `display:block;width:60px;height:auto;image-rendering:pixelated;position:relative;z-index:2;filter:drop-shadow(0 0 6px ${char.aura});`;
+  img.draggable = false;
+  wrap.appendChild(img);
+  const kiOrb = document.createElement('div');
+  kiOrb.className = 'ki-orb';
+  kiOrb.style.cssText = `width:14px;height:14px;top:-18px;left:50%;transform:translateX(-50%);color:${char.aura};display:none;`;
+  wrap.appendChild(kiOrb);
+  const bubble = document.createElement('div');
+  bubble.className = 'speech-bubble';
+  bubble.id = 'bubble-' + char.id;
+  wrap.appendChild(bubble);
+  const name = document.createElement('div');
+  name.className = 'char-name';
+  name.textContent = char.name.toUpperCase();
+  name.style.color = char.aura;
+  name.style.textShadow = `0 0 8px ${char.aura}`;
+  wrap.appendChild(name);
+  wrap.addEventListener('click', e => {
+    e.stopPropagation();
+    doJump(char);
+    speak(char, char.quotes[Math.floor(Math.random()*char.quotes.length)]);
+    boom(char.x + 30, window.innerHeight - 80, char.aura);
+  });
+  return { wrap, img, aura, kiOrb, bubble };
+}
+
+function init() {
+  prerender();
+  const layer = document.getElementById('characters-layer');
+  if (!layer) return;
+  CHARS.forEach(char => { const el = buildCharEl(char); layer.appendChild(el.wrap); els[char.id] = el; });
+  requestAnimationFrame(loop);
+  setInterval(() => speak(CHARS[Math.floor(Math.random()*CHARS.length)]), 4000);
+  setInterval(doInteraction, 7500);
+  setInterval(doPowerUp, 12000);
+}
+
+function loop() {
+  frame++;
+  const W = window.innerWidth;
+  CHARS.forEach(char => {
+    const el = els[char.id];
+    if (!el) return;
+    char.timer--;
+    if (char.timer <= 0) nextState(char);
+    if (char.jumping) { char.vy += GRAV; char.y -= char.vy; if (char.y <= 0) { char.y=0; char.jumping=false; char.vy=0; } }
+    if (char.state==='walk') char.x += char.vx;
+    if (char.state==='run') char.x += char.vx * 3;
+    if (char.state==='fight') char.x += char.vx * 1.2;
+    if (char.state==='float') { char.x += char.vx * 0.6; char.y = 25 + Math.sin(frame * 0.02) * 18; }
+    if (char.x > W - 70) { char.x = W-70; char.vx = -Math.abs(char.vx); char.flipped = true; }
+    if (char.x < 5) { char.x = 5; char.vx = Math.abs(char.vx); char.flipped = false; }
+    el.wrap.style.left = char.x + 'px';
+    el.wrap.style.bottom = Math.max(0, char.y) + 'px';
+    el.wrap.style.transform = char.flipped ? 'scaleX(-1)' : 'scaleX(1)';
+    if (char.state==='powerup') { el.img.style.filter=`drop-shadow(0 0 20px ${char.aura}) drop-shadow(0 0 40px ${char.glow}) brightness(1.5)`; el.aura.style.width='90px'; el.aura.style.height='30px'; el.aura.style.opacity='0.9'; el.kiOrb.style.display='block'; }
+    else if (char.state==='fight') { el.img.style.filter=`drop-shadow(0 0 12px ${char.aura}) brightness(1.2)`; el.aura.style.width='75px'; el.aura.style.height='22px'; el.aura.style.opacity='0.7'; el.kiOrb.style.display='none'; }
+    else { el.img.style.filter=`drop-shadow(0 0 6px ${char.aura}) drop-shadow(0 2px 6px #000)`; el.aura.style.width='65px'; el.aura.style.height='16px'; el.aura.style.opacity='0.5'; el.kiOrb.style.display='none'; }
+    if (char.state==='walk') el.wrap.style.animation='walkBob 0.4s ease-in-out infinite';
+    else if (char.state==='run') el.wrap.style.animation='runBob 0.2s ease-in-out infinite';
+    else if (char.state==='idle') el.wrap.style.animation='idleBreath 2s ease-in-out infinite';
+    else if (char.state==='powerup') el.wrap.style.animation='powerUp 1.5s ease-in-out infinite';
+    else if (char.state==='float') el.wrap.style.animation='floatUp 2s ease-in-out infinite';
+    else el.wrap.style.animation='none';
+  });
+  requestAnimationFrame(loop);
+}
+
+function nextState(char) {
+  const r = Math.random();
+  if (r < 0.28) { char.state='walk'; char.timer=100+Math.random()*150; }
+  else if (r < 0.40) { char.state='run'; char.timer=30+Math.random()*50; char.vx=(Math.random()>.5?1:-1)*char.speed; char.flipped=char.vx<0; }
+  else if (r < 0.55) { char.state='idle'; char.timer=80+Math.random()*120; }
+  else if (r < 0.65) { char.state='jump'; char.timer=60; doJump(char); char.state='walk'; }
+  else if (r < 0.78) { char.state='fight'; char.timer=50+Math.random()*60; }
+  else if (char.id==='frieza') { char.state='float'; char.timer=120+Math.random()*120; }
+  else { char.state='walk'; char.timer=100; }
+}
+function doJump(char) { if (!char.jumping) { char.jumping=true; char.vy=-(char.jumpH*0.18); } }
+function speak(char, text) {
+  text = text || char.quotes[Math.floor(Math.random()*char.quotes.length)];
+  const el = els[char.id]; if (!el) return;
+  el.bubble.textContent = text; el.bubble.style.opacity='1';
+  setTimeout(() => { el.bubble.style.opacity='0'; }, 2200);
+}
+function doInteraction() {
+  if (CHARS.length < 2) return;
+  let a=Math.floor(Math.random()*CHARS.length), b=Math.floor(Math.random()*CHARS.length);
+  while(b===a) b=Math.floor(Math.random()*CHARS.length);
+  const from=CHARS[a], to=CHARS[b];
+  speak(from, from.fightQ[Math.floor(Math.random()*from.fightQ.length)]);
+  from.state='fight'; from.timer=70;
+  const el=document.createElement('div');
+  const sx=from.x+30, sy=window.innerHeight-100, ex=to.x+30, ey=window.innerHeight-100;
+  el.style.cssText=`position:fixed;left:${sx}px;top:${sy}px;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle,#fff,${from.aura},transparent);box-shadow:0 0 16px ${from.aura};pointer-events:none;z-index:8;transform:translate(-50%,-50%);`;
+  document.body.appendChild(el);
+  const dx=ex-sx, dy=ey-sy, dist=Math.sqrt(dx*dx+dy*dy), dur=Math.max(220,dist*.65);
+  let t0=null;
+  (function step(ts){ if(!t0)t0=ts; const p=Math.min(1,(ts-t0)/dur); el.style.left=(sx+dx*p)+'px'; el.style.top=(sy+dy*p-100*Math.sin(Math.PI*p))+'px'; el.style.opacity=String(1-p*.3); if(p<1){requestAnimationFrame(step);}else{boom(ex,ey,from.aura);el.remove();speak(to,to.quotes[Math.floor(Math.random()*to.quotes.length)]);} })(performance.now());
+}
+function boom(x, y, color) {
+  for(let i=0;i<6;i++){const e=document.createElement('div');const s=20+Math.random()*30;e.style.cssText=`position:fixed;left:${x+(Math.random()-.5)*50}px;top:${y+(Math.random()-.5)*40}px;width:${s}px;height:${s}px;border-radius:50%;background:radial-gradient(circle,#fff,${color},transparent);pointer-events:none;z-index:9;animation:explosion .55s ease-out forwards;animation-delay:${i*.04}s;`;document.body.appendChild(e);setTimeout(()=>e.remove(),650);}
+}
+function doPowerUp() {
+  const char=CHARS[Math.floor(Math.random()*CHARS.length)]; const el=els[char.id]; if(!el)return;
+  char.state='powerup'; char.timer=100;
+  speak(char, char.powerQ[Math.floor(Math.random()*char.powerQ.length)]);
+  boom(char.x+30, window.innerHeight-80, char.aura);
+  if(char.id==='goku'&&!char.isSSJ&&Math.random()>.4){char.isSSJ=true;el.img.src=imgCache['goku_ssj'];el.aura.style.background='#ffd700';setTimeout(()=>{char.isSSJ=false;el.img.src=imgCache['goku'];el.aura.style.background=char.aura;},15000);}
+}
+document.addEventListener('click', e=>{if(e.target.closest&&e.target.closest('#characters-layer'))return;const p=document.createElement('div');p.className='ki-particle';const s=10+Math.random()*12;p.style.cssText=`left:${e.clientX-s/2}px;top:${e.clientY-s/2}px;width:${s}px;height:${s}px;`;document.body.appendChild(p);setTimeout(()=>p.remove(),600);});
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init);
+else setTimeout(init,80);
+window.dbzBoom=boom;
+})();
+"""
+
+# ─────────────────────────────────────────────────────────────────────
+# DBZ INTRO
+# ─────────────────────────────────────────────────────────────────────
+DBZ_INTRO = r"""
+<div id="dbz-intro" style="position:fixed;inset:0;z-index:99999;background:#000;font-family:'Bangers',cursive;overflow:hidden;">
+  <button id="intro-skip" style="position:absolute;top:18px;right:18px;z-index:10;background:transparent;border:1px solid rgba(255,106,0,.5);color:rgba(255,106,0,.8);font-family:'Bangers',cursive;font-size:.9rem;letter-spacing:.15em;padding:6px 16px;cursor:pointer;border-radius:2px;" onclick="window.__dbzSkip && window.__dbzSkip()">SKIP ▶</button>
+  <div id="iFlash" style="position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:5;"></div>
+  <div id="iCharge" style="position:absolute;inset:0;opacity:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,#1a0800,#000 70%);">
+    <canvas id="iLCanvas" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;"></canvas>
+    <div style="position:absolute;top:24px;right:24px;background:rgba(0,0,0,.85);border:2px solid #ff6a00;padding:8px 16px;border-radius:3px;box-shadow:0 0 20px rgba(255,106,0,.4);">
+      <div style="font-size:.55rem;color:#c8a878;letter-spacing:.3em;margin-bottom:2px;">POWER LEVEL</div>
+      <div id="iPL" style="font-size:2rem;color:#ffd700;letter-spacing:.05em;">000000</div>
+    </div>
+    <div style="position:absolute;top:24px;left:24px;font-family:'Share Tech Mono',monospace;font-size:.7rem;color:#00ff44;opacity:0;" id="iScout">SCOUTING...</div>
+    <div id="iAura" style="position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:60px;height:0;background:linear-gradient(0deg,#ffd700,#ff6a00,transparent);filter:blur(10px);opacity:0;border-radius:50% 50% 0 0;"></div>
+    <div id="iShockWrap" style="position:absolute;bottom:30px;left:50%;transform:translateX(-50%);width:0;height:0;pointer-events:none;"></div>
+    <div id="iSil" style="position:absolute;bottom:50px;left:50%;transform:translateX(-50%);opacity:0;">
+      <canvas id="iSilCanvas" width="96" height="160" style="image-rendering:pixelated;filter:brightness(0) saturate(0) invert(1) sepia(1) saturate(5) hue-rotate(5deg);"></canvas>
+    </div>
+    <div id="iScream" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.5);font-size:clamp(2.5rem,8vw,6rem);letter-spacing:.08em;opacity:0;background:linear-gradient(135deg,#fff,#ffd700,#ff6a00);-webkit-background-clip:text;-webkit-text-fill-color:transparent;white-space:nowrap;text-align:center;transition:transform .2s,opacity .15s;">AAAAHHHHH!!!</div>
+  </div>
+  <div id="iTitle" style="position:absolute;inset:0;opacity:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,#0d0400,#000 80%);">
+    <canvas id="iSpeedCanvas" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:0.35;"></canvas>
+    <div id="iDBalls" style="display:flex;gap:14px;margin-bottom:20px;opacity:0;"></div>
+    <div id="iTitleText" style="font-size:clamp(2.5rem,10vw,7rem);letter-spacing:.08em;line-height:.95;text-align:center;opacity:0;transform:scale(3);background:linear-gradient(135deg,#fff 0%,#ffd700 35%,#ff6a00 65%,#ff1a1a 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 25px #ff6a0088);">CTF</div>
+    <div id="iSub" style="font-size:clamp(.75rem,2vw,1.1rem);letter-spacing:.4em;color:#ff6a00;margin-top:14px;opacity:0;">⚡ CAPTURE THE FLAG ⚡</div>
+    <div id="iBarWrap" style="margin-top:28px;width:min(380px,80vw);opacity:0;">
+      <div style="font-size:.6rem;color:#c8a878;letter-spacing:.3em;margin-bottom:5px;text-align:center;">LOADING BATTLE DATA...</div>
+      <div style="background:rgba(255,106,0,.15);border:1px solid rgba(255,106,0,.4);border-radius:2px;height:7px;overflow:hidden;">
+        <div id="iBar" style="height:100%;width:0%;background:linear-gradient(90deg,#ff6a00,#ffd700);box-shadow:0 0 8px #ffd700;transition:width .04s linear;"></div>
+      </div>
+    </div>
+    <button id="iEnterBtn" onclick="window.__dbzSkip && window.__dbzSkip()" style="display:none;margin-top:28px;padding:12px 44px;font-family:'Bangers',cursive;font-size:1.3rem;letter-spacing:.18em;border:2px solid #ffd700;background:linear-gradient(135deg,rgba(255,215,0,.18),rgba(255,106,0,.08));color:#ffd700;cursor:pointer;border-radius:2px;animation:enterpulse 1.4s ease-in-out infinite;">⚡ ENTER THE BATTLE ⚡</button>
+  </div>
+  <div id="iParade" style="position:absolute;inset:0;opacity:0;background:#000;overflow:hidden;">
+    <canvas id="iParadeCanvas" style="position:absolute;inset:0;width:100%;height:100%;opacity:0.4;"></canvas>
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;">
+      <canvas id="iCharCanvas" width="120" height="200" style="image-rendering:pixelated;display:block;margin:0 auto;transform:scale(0);transition:transform .35s cubic-bezier(.34,1.56,.64,1);filter:drop-shadow(0 0 20px #ffd700);"></canvas>
+      <div id="iCharName" style="font-size:clamp(2rem,6vw,3.5rem);letter-spacing:.15em;color:#ffd700;margin-top:8px;opacity:0;transform:translateY(16px);transition:all .35s ease;"></div>
+      <div id="iCharQuote" style="font-size:clamp(.85rem,2vw,1.2rem);letter-spacing:.08em;color:#ff6a00;margin-top:4px;opacity:0;transform:translateY(8px);transition:all .3s ease .1s;"></div>
+    </div>
+    <div id="iVsFlash" style="position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;"></div>
+  </div>
+</div>
+<style>
+@keyframes enterpulse{0%,100%{box-shadow:0 0 16px rgba(255,215,0,.3),0 0 32px rgba(255,106,0,.15)}50%{box-shadow:0 0 32px rgba(255,215,0,.6),0 0 64px rgba(255,106,0,.35)}}
+@keyframes dballspin{0%{box-shadow:0 0 8px rgba(255,215,0,.4)}50%{box-shadow:0 0 20px rgba(255,215,0,.9),0 0 40px rgba(255,106,0,.4)}100%{box-shadow:0 0 8px rgba(255,215,0,.4)}}
+</style>
+<script>
+(function(){
+if(sessionStorage.getItem('dbz_done')){document.getElementById('dbz-intro').style.display='none';return;}
+const PAL2={W:'#fff',SK:'#f5c97a',SK2:'#e8a85a',DK:'#1a0800',BK:'#111',OR:'#ff6a00',YL:'#ffd700',RD:'#ff2200',BL:'#1a44cc',PU:'#7700cc',GR:'#116611',GY:'#888',LG:'#22aa33',PK:'#ff44cc',WH:'#eeeeff',NV:'#001166',OG:'#ff8800',TL:'#00bbaa',SL:'#ccccdd',CY:'#00ddff'};
+const GOKU_GRID=[[0,0,'BK','BK','BK','BK','BK','BK','BK',0,0,0],[0,'BK','BK','BK','BK','BK','BK','BK','BK','BK',0,0],['BK','BK','BK','SK','SK','SK','SK','SK','BK','BK','BK',0],[0,'BK','SK','SK','SK','SK','SK','SK','SK','BK',0,0],[0,'SK','SK','W','BK','SK','W','BK','SK','SK',0,0],[0,'SK','SK','SK','SK','SK','SK','SK','SK','SK',0,0],[0,'SK','SK','SK','OR','SK','SK','OR','SK','SK',0,0],[0,0,'SK','SK','SK','SK','SK','SK','SK',0,0,0],[0,0,0,'SK','SK','SK','SK','SK',0,0,0,0],[0,'OR','OR','OR','OR','OR','OR','OR','OR','OR',0,0],[0,'OR','BL','OR','OR','OR','OR','OR','BL','OR',0,0],['OR','OR','OR','OR','OR','OR','OR','OR','OR','OR','OR',0],[0,'BL','BL','BL','BL','BL','BL','BL','BL','BL',0,0],[0,'BL','BL','OR','BL','BL','BL','OR','BL','BL',0,0],[0,'BL','BL','OR','BL','BL','BL','OR','BL','BL',0,0],[0,'BL','BL','OR','BL','BL','BL','OR','BL','BL',0,0],[0,0,'OR','OR','BL',0,0,'BL','OR','OR',0,0],[0,0,'OR','OR','BL',0,0,'BL','OR','OR',0,0],[0,0,'RD','RD','RD',0,0,'RD','RD','RD',0,0],[0,0,'RD','RD','RD',0,0,'RD','RD','RD',0,0]];
+const VG=[[0,'BK','BK','BK','BK','BK','BK','BK','BK','BK',0,0],['BK','BK','BK','BK','BK','BK','BK','BK','BK','BK','BK',0],['BK','BK','BK','SK','SK','SK','SK','SK','BK','BK','BK',0],[0,'BK','SK','SK','SK','SK','SK','SK','SK','BK',0,0],[0,'SK','SK','W','BK','SK','W','BK','SK','SK',0,0],[0,'SK','SK','SK','SK','SK','SK','SK','SK','SK',0,0],[0,'SK','SK','SK',0,'SK','SK',0,'SK','SK',0,0],[0,0,'SK','SK','SK','SK','SK','SK','SK',0,0,0],[0,0,0,'SK','SK','SK','SK','SK',0,0,0,0],[0,'WH','WH','WH','WH','WH','WH','WH','WH','WH',0,0],[0,'WH','YL','WH','WH','WH','WH','WH','YL','WH',0,0],['WH','WH','WH','WH','WH','WH','WH','WH','WH','WH','WH',0],[0,'BK','BK','BK','BK','BK','BK','BK','BK','BK',0,0],[0,'NV','NV','WH','NV','NV','NV','WH','NV','NV',0,0],[0,'NV','NV','WH','NV','NV','NV','WH','NV','NV',0,0],[0,'NV','NV','WH','NV','NV','NV','WH','NV','NV',0,0],[0,0,'NV','NV','NV',0,0,'NV','NV','NV',0,0],[0,0,'NV','NV','NV',0,0,'NV','NV','NV',0,0],[0,0,'WH','WH','WH',0,0,'WH','WH','WH',0,0],[0,0,'WH','WH','WH',0,0,'WH','WH','WH',0,0]];
+const PIC=[[0,0,0,'LG','LG',0,0,'LG','LG',0,0,0],[0,0,0,'LG','LG',0,0,'LG','LG',0,0,0],[0,0,'LG','LG','LG','LG','LG','LG','LG','LG',0,0],[0,'LG','LG','LG','LG','LG','LG','LG','LG','LG','LG',0],[0,'LG','LG','W','BK','LG','W','BK','LG','LG',0,0],[0,'LG','LG','LG','LG','LG','LG','LG','LG','LG',0,0],[0,'LG','LG','LG','LG','LG','LG','LG','LG','LG',0,0],[0,0,'LG','LG','LG','LG','LG','LG','LG',0,0,0],[0,0,0,'LG','LG','LG','LG','LG',0,0,0,0],[0,'PU','PU','PU','PU','PU','PU','PU','PU','PU',0,0],[0,'PU','WH','PU','PU','PU','PU','PU','WH','PU',0,0],['PU','PU','PU','PU','PU','PU','PU','PU','PU','PU','PU',0],[0,'WH','WH','WH','WH','WH','WH','WH','WH','WH',0,0],[0,'PU','PU','WH','PU','PU','PU','WH','PU','PU',0,0],[0,'PU','PU','WH','PU','PU','PU','WH','PU','PU',0,0],[0,'PU','PU','WH','PU','PU','PU','WH','PU','PU',0,0],[0,0,'PU','PU','PU',0,0,'PU','PU','PU',0,0],[0,0,'PU','PU','PU',0,0,'PU','PU','PU',0,0],[0,0,'WH','WH','WH',0,0,'WH','WH','WH',0,0],[0,0,'WH','WH','WH',0,0,'WH','WH','WH',0,0]];
+const GH=[[0,0,'BK','BK','BK','BK','BK','BK',0,0,0,0],[0,'BK','BK','BK','BK','BK','BK','BK','BK','BK',0,0],['BK','BK','BK','SK','SK','SK','SK','SK','BK','BK',0,0],[0,'BK','SK','SK','SK','SK','SK','SK','SK','BK',0,0],[0,'SK','SK','W','BK','SK','W','BK','SK','SK',0,0],[0,'SK','SK','SK','SK','SK','SK','SK','SK','SK',0,0],[0,'SK','SK','SK',0,'SK','SK',0,'SK','SK',0,0],[0,0,'SK','SK','SK','SK','SK','SK','SK',0,0,0],[0,0,0,'SK','SK','SK','SK','SK',0,0,0,0],[0,'PU','PU','PU','PU','PU','PU','PU','PU','PU',0,0],[0,'PU','YL','PU','PU','PU','PU','PU','YL','PU',0,0],['PU','PU','PU','PU','PU','PU','PU','PU','PU','PU','PU',0],[0,'YL','YL','YL','YL','YL','YL','YL','YL','YL',0,0],[0,'BL','BL','YL','BL','BL','BL','YL','BL','BL',0,0],[0,'BL','BL','YL','BL','BL','BL','YL','BL','BL',0,0],[0,'BL','BL','YL','BL','BL','BL','YL','BL','BL',0,0],[0,0,'BL','BL','BL',0,0,'BL','BL','BL',0,0],[0,0,'BL','BL','BL',0,0,'BL','BL','BL',0,0],[0,0,'BK','BK','BK',0,0,'BK','BK','BK',0,0],[0,0,'BK','BK','BK',0,0,'BK','BK','BK',0,0]];
+const FZ=[[0,0,'WH','WH','WH','WH','WH','WH','WH',0,0,0],[0,'WH','WH','WH','WH','WH','WH','WH','WH','WH',0,0],[0,'WH','PU','WH','WH','WH','WH','WH','PU','WH',0,0],[0,'WH','WH','WH','WH','WH','WH','WH','WH','WH',0,0],[0,'WH','WH','RD','BK','WH','RD','BK','WH','WH',0,0],[0,'WH','WH','WH','WH','WH','WH','WH','WH','WH',0,0],[0,'WH','PU','WH','WH','WH','WH','WH','PU','WH',0,0],[0,0,'WH','WH','WH','WH','WH','WH','WH',0,0,0],[0,0,0,'WH','WH','WH','WH','WH',0,0,0,0],[0,'WH','WH','WH','WH','WH','WH','WH','WH','WH',0,0],[0,'WH','PU','WH','WH','WH','WH','WH','PU','WH',0,0],['WH','WH','WH','WH','WH','WH','WH','WH','WH','WH','WH',0],[0,'PU','PU','PU','PU','PU','PU','PU','PU','PU',0,0],[0,'WH','WH','PU','WH','WH','WH','PU','WH','WH',0,0],[0,'WH','WH','PU','WH','WH','WH','PU','WH','WH',0,0],[0,'WH','WH','PU','WH','WH','WH','PU','WH','WH',0,0],[0,0,'WH','WH','WH',0,0,'WH','WH','WH',0,0],[0,0,'WH','WH','WH',0,0,'WH','WH','WH',0,0],[0,0,'PU','PU','PU',0,0,'PU','PU','PU',0,0],[0,0,'PU','PU','PU',0,0,'PU','PU','PU',0,0]];
+const CHARS_PARADE=[{name:'GOKU',grid:GOKU_GRID,aura:'#ffd700',quote:'"KAMEHAMEHA!!"'},{name:'VEGETA',grid:VG,aura:'#8800ff',quote:'"OVER 9000!!"'},{name:'PICCOLO',grid:PIC,aura:'#00aa44',quote:'"SPECIAL BEAM CANNON!!"'},{name:'GOHAN',grid:GH,aura:'#ffd700',quote:'"THIS POWER...!"'},{name:'FRIEZA',grid:FZ,aura:'#cc44ff',quote:'"KNEEL BEFORE ME!!"'}];
+function drawGrid(canvas,grid,scale){const ctx=canvas.getContext('2d');ctx.clearRect(0,0,canvas.width,canvas.height);grid.forEach((row,r)=>{row.forEach((v,c)=>{if(!v||v===0)return;ctx.fillStyle=PAL2[v]||v;ctx.fillRect(c*scale,r*scale,scale,scale);});});}
+function drawLightning(canvas,color,n){const ctx=canvas.getContext('2d');canvas.width=canvas.offsetWidth||window.innerWidth;canvas.height=canvas.offsetHeight||window.innerHeight;ctx.clearRect(0,0,canvas.width,canvas.height);const cx=canvas.width/2,cy=canvas.height*.6;for(let i=0;i<n;i++){ctx.beginPath();ctx.strokeStyle=color;ctx.lineWidth=Math.random()*2+.5;ctx.globalAlpha=Math.random()*.7+.2;let x=cx+(Math.random()-.5)*180,y=cy+(Math.random()-.5)*180;ctx.moveTo(x,y);for(let j=0;j<5;j++){x+=(Math.random()-.5)*110;y+=(Math.random()-.5)*110;ctx.lineTo(x,y);}ctx.stroke();}ctx.globalAlpha=1;}
+function drawSpeed(canvas){const ctx=canvas.getContext('2d');canvas.width=canvas.offsetWidth||window.innerWidth;canvas.height=canvas.offsetHeight||window.innerHeight;ctx.clearRect(0,0,canvas.width,canvas.height);const cx=canvas.width/2,cy=canvas.height/2;for(let i=0;i<70;i++){const a=(i/70)*Math.PI*2;const inner=50+Math.random()*30;const outer=Math.max(canvas.width,canvas.height)*1.2;ctx.beginPath();ctx.strokeStyle=i%3===0?'#ffd700':i%3===1?'#ff6a00':'#ffffff33';ctx.lineWidth=Math.random()*2.5+.3;ctx.globalAlpha=.25+Math.random()*.25;ctx.moveTo(cx+Math.cos(a)*inner,cy+Math.sin(a)*inner);ctx.lineTo(cx+Math.cos(a)*outer,cy+Math.sin(a)*outer);ctx.stroke();}ctx.globalAlpha=1;}
+function drawParadeLines(canvas,color,t){const ctx=canvas.getContext('2d');canvas.width=canvas.offsetWidth||window.innerWidth;canvas.height=canvas.offsetHeight||window.innerHeight;ctx.clearRect(0,0,canvas.width,canvas.height);const cx=canvas.width/2;for(let i=0;i<55;i++){const a=(i/55)*Math.PI*2+t;const inner=60;const outer=550+Math.sin(t*3+i)*80;ctx.beginPath();ctx.strokeStyle=i%2===0?color:'#ffffff18';ctx.lineWidth=Math.random()*1.8+.3;ctx.globalAlpha=.25+Math.sin(t*2+i)*.12;ctx.moveTo(cx+Math.cos(a)*inner,canvas.height*.35+Math.sin(a)*inner*.3);ctx.lineTo(cx+Math.cos(a)*outer,canvas.height*.35+Math.sin(a)*outer*.3);ctx.stroke();}ctx.globalAlpha=1;}
+function makeDball(size){const c=document.createElement('canvas');c.width=size;c.height=size;const ctx=c.getContext('2d');const g=ctx.createRadialGradient(size*.35,size*.35,0,size*.5,size*.5,size*.5);g.addColorStop(0,'#fffcdd');g.addColorStop(.4,'#ffd700');g.addColorStop(.8,'#ff6a00');g.addColorStop(1,'#8b4500');ctx.beginPath();ctx.arc(size/2,size/2,size/2,0,Math.PI*2);ctx.fillStyle=g;ctx.fill();ctx.fillStyle='#cc3300';[[.5,.38],[.38,.5],[.62,.5],[.5,.62],[.38,.38],[.62,.62],[.5,.5]].forEach(([x,y],i)=>{ctx.beginPath();ctx.arc(x*size,y*size,size*.07,0,Math.PI*2);if(i<7)ctx.fill();});return c.toDataURL();}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+let running=true;
+window.__dbzSkip=function(){running=false;const intro=document.getElementById('dbz-intro');intro.style.transition='opacity .4s';intro.style.opacity='0';setTimeout(()=>{intro.style.display='none';sessionStorage.setItem('dbz_done','1');},400);};
+async function run(){
+  const iFlash=document.getElementById('iFlash'),iCharge=document.getElementById('iCharge'),iTitle=document.getElementById('iTitle'),iParade=document.getElementById('iParade');
+  const fade=(el,o,d=300)=>new Promise(r=>{el.style.transition=`opacity ${d}ms`;el.style.opacity=o;setTimeout(r,d+20);});
+  await sleep(150);if(!running)return;
+  await fade(iFlash,1,60);await fade(iFlash,0,60);await sleep(80);await fade(iFlash,1,50);await fade(iFlash,0,80);
+  if(!running)return;
+  await fade(iCharge,1,300);
+  const scout=document.getElementById('iScout');scout.style.transition='opacity .3s';scout.style.opacity='1';
+  const plEl=document.getElementById('iPL');let plVal=0,plTarget=530000;
+  const plInterval=setInterval(()=>{if(!running){clearInterval(plInterval);return;}plVal=Math.min(plVal+Math.floor(plTarget/120)+1000,plTarget);plEl.textContent=String(plVal).padStart(6,'0');if(plVal>=plTarget)clearInterval(plInterval);},20);
+  const iAura=document.getElementById('iAura');iAura.style.transition='height 2s ease-out,opacity .3s';iAura.style.opacity='0.9';setTimeout(()=>{iAura.style.height='70vh';},50);
+  const silCanvas=document.getElementById('iSilCanvas');silCanvas.width=120;silCanvas.height=160;drawGrid(silCanvas,GOKU_GRID,10);
+  const iSil=document.getElementById('iSil');await sleep(500);if(!running)return;iSil.style.transition='opacity .4s';iSil.style.opacity='1';
+  const shockWrap=document.getElementById('iShockWrap');
+  [['#ff6a00',600,0],['#ffd700',800,150],['#ffffff88',1000,300]].forEach(([col,size,delay])=>{setTimeout(()=>{const s=document.createElement('div');s.style.cssText=`position:absolute;left:50%;top:50%;border-radius:50%;border:3px solid ${col};width:0;height:0;margin-left:0;margin-top:0;opacity:1;transition:all 700ms ease-out;`;shockWrap.appendChild(s);setTimeout(()=>{s.style.width=size+'px';s.style.height=Math.round(size*.35)+'px';s.style.marginLeft=-(size/2)+'px';s.style.marginTop=-(size*.175)+'px';s.style.opacity='0';},30);setTimeout(()=>s.remove(),800);},delay);});
+  await sleep(600);if(!running)return;
+  const lc=document.getElementById('iLCanvas');lc.style.transition='opacity .2s';lc.style.opacity='0.8';let lTick=0;
+  const lInterval=setInterval(()=>{if(!running){clearInterval(lInterval);return;}drawLightning(lc,lTick%2===0?'#ffd700':'#fff',7);if(++lTick>18)clearInterval(lInterval);},100);
+  await sleep(400);if(!running)return;
+  const scr=document.getElementById('iScream');scr.style.opacity='1';scr.style.transform='translate(-50%,-50%) scale(1)';await sleep(180);scr.style.transform='translate(-50%,-50%) scale(1.12)';await sleep(180);scr.style.transform='translate(-50%,-50%) scale(0.97)';
+  await sleep(350);if(!running)return;scout.textContent="IT'S OVER 9000!!";scout.style.color='#ff0000';scout.style.fontSize='1rem';
+  await sleep(700);if(!running)return;
+  await fade(iFlash,1,70);iCharge.style.opacity='0';await fade(iFlash,0,80);
+  if(!running)return;await fade(iTitle,1,350);
+  const sc=document.getElementById('iSpeedCanvas');drawSpeed(sc);
+  const dbWrap=document.getElementById('iDBalls');const dbImg=makeDball(30);
+  for(let i=0;i<7;i++){const img=document.createElement('img');img.src=dbImg;img.width=30;img.height=30;img.style.cssText=`border-radius:50%;box-shadow:0 0 10px rgba(255,215,0,.5);animation:dballspin 2s ease-in-out ${i*.12}s infinite;transform:translateY(-30px);opacity:0;transition:transform .45s cubic-bezier(.34,1.56,.64,1) ${i*.08}s, opacity .3s ${i*.08}s;`;dbWrap.appendChild(img);}
+  dbWrap.style.transition='opacity .2s';dbWrap.style.opacity='1';await sleep(50);dbWrap.querySelectorAll('img').forEach(img=>{img.style.transform='translateY(0)';img.style.opacity='1';});
+  await sleep(500);if(!running)return;
+  const tEl=document.getElementById('iTitleText');const pgTitle=document.title.replace(/\s*-.*$/,'').trim()||'CTF';tEl.textContent=pgTitle;tEl.style.transition='none';tEl.style.opacity='0';tEl.style.transform='scale(4)';await sleep(30);tEl.style.transition='all .3s cubic-bezier(.34,1.56,.64,1)';tEl.style.opacity='1';tEl.style.transform='scale(1)';
+  const intro=document.getElementById('dbz-intro');['-4px,2px','4px,-3px','-2px,3px','1px,-1px','0,0'].forEach((t,i)=>{setTimeout(()=>{const[x,y]=t.split(',');intro.style.transform=`translate(${x},${y})`;},i*45);});
+  await sleep(280);if(!running)return;
+  const sub=document.getElementById('iSub');sub.style.transition='opacity .4s,transform .4s';sub.style.opacity='1';sub.style.transform='translateY(0)';
+  await sleep(200);if(!running)return;
+  const bWrap=document.getElementById('iBarWrap');bWrap.style.transition='opacity .3s';bWrap.style.opacity='1';const bar=document.getElementById('iBar');let bp=0;
+  const barInterval=setInterval(()=>{if(!running){clearInterval(barInterval);return;}bp=Math.min(100,bp+2);bar.style.width=bp+'%';if(bp>=100)clearInterval(barInterval);},28);
+  await sleep(1700);if(!running)return;
+  await fade(iFlash,1,70);iTitle.style.opacity='0';await fade(iFlash,0,80);
+  if(!running)return;await fade(iParade,1,300);
+  let parT=0,charIdx=0,parAF=null;
+  const pCanvas=document.getElementById('iParadeCanvas');
+  function paradeLoop(){if(!running)return;drawParadeLines(pCanvas,CHARS_PARADE[Math.min(charIdx,CHARS_PARADE.length-1)].aura+'88',parT);parT+=0.04;parAF=requestAnimationFrame(paradeLoop);}
+  paradeLoop();
+  const cCanvas=document.getElementById('iCharCanvas');cCanvas.width=120;cCanvas.height=160;
+  const cName=document.getElementById('iCharName'),cQuote=document.getElementById('iCharQuote'),vsFlash=document.getElementById('iVsFlash');
+  for(charIdx=0;charIdx<CHARS_PARADE.length;charIdx++){
+    if(!running)break;const cd=CHARS_PARADE[charIdx];
+    cCanvas.style.transform='scale(0)';cName.style.opacity='0';cName.style.transform='translateY(16px)';cQuote.style.opacity='0';cQuote.style.transform='translateY(8px)';vsFlash.style.opacity='0';
+    await sleep(80);if(!running)break;
+    drawGrid(cCanvas,cd.grid,10);cName.textContent=cd.name;cName.style.color=cd.aura;cName.style.textShadow=`0 0 20px ${cd.aura}`;cQuote.textContent=cd.quote;cCanvas.style.filter=`drop-shadow(0 0 20px ${cd.aura}) drop-shadow(0 0 40px ${cd.aura}88)`;
+    cCanvas.style.transform='scale(1)';await sleep(350);if(!running)break;cName.style.opacity='1';cName.style.transform='translateY(0)';await sleep(280);if(!running)break;cQuote.style.opacity='1';cQuote.style.transform='translateY(0)';
+    await sleep(120);if(!running)break;vsFlash.style.transition='opacity .08s';vsFlash.style.background=`radial-gradient(ellipse at center,rgba(255,255,255,.88),${cd.aura}66,transparent 60%)`;vsFlash.style.opacity='0.6';await sleep(80);vsFlash.style.transition='opacity .35s';vsFlash.style.opacity='0';await sleep(charIdx<CHARS_PARADE.length-1?1200:600);
+  }
+  if(parAF)cancelAnimationFrame(parAF);if(!running)return;
+  await fade(iFlash,1,80);iParade.style.opacity='0';await fade(iFlash,0,80);iTitle.style.opacity='1';
+  const enterBtn=document.getElementById('iEnterBtn'),barWrapEl=document.getElementById('iBarWrap');
+  if(enterBtn)enterBtn.style.display='block';if(barWrapEl)barWrapEl.style.display='none';
+  setTimeout(()=>{if(running&&window.__dbzSkip)window.__dbzSkip();},4000);
+}
 run();
 })();
 </script>
@@ -1360,7 +858,7 @@ tr:hover td{background:rgba(255,106,0,.05)}
 @keyframes kiblast{0%{transform:scale(0);opacity:1}50%{opacity:.8}100%{transform:scale(3);opacity:0}}
 @keyframes kicharge{0%{box-shadow:0 0 5px var(--orange)}50%{box-shadow:0 0 30px var(--yellow),0 0 60px var(--orange)}100%{box-shadow:0 0 5px var(--orange)}}
 .ki-charging{animation:kicharge 1s ease-in-out infinite}
-""" + PIXEL_ART_CSS
+""" + PIXEL_ART_CSS + TEAM_CSS
 
 TIMER_JS = """
 function updateTimer(){
@@ -1375,6 +873,361 @@ function updateTimer(){
 function fmt(ms){const h=Math.floor(ms/3600000),m=Math.floor(ms%3600000/60000),s=Math.floor(ms%60000/1000);return`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;}
 updateTimer();setInterval(updateTimer,1000);
 """
+
+# ─────────────────────────────────────────────────────────────────────
+# TEAM PAGE HTML
+# ─────────────────────────────────────────────────────────────────────
+
+TEAM_HTML = """<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>Teams - {{ ctf_name }}</title>
+<style>""" + BASE_STYLE + """</style></head><body>
+""" + DBZ_INTRO + """
+<div id="characters-layer"></div>
+<div class="scouter-scan"></div>
+<div class="energy-lines">
+  <span style="top:15%;width:65%;left:18%;animation-delay:0s;animation-duration:5s"></span>
+  <span style="top:55%;width:55%;left:22%;animation-delay:2s;animation-duration:4s"></span>
+</div>
+<header class="header">
+  <a class="logo" href="/">{{ ctf_name }}<span> CTF</span></a>
+  <nav>
+    <a href="/">⚔ ARENA</a>
+    <a href="/teams" class="active">🛡 TEAMS</a>
+    <div class="user-bar" id="user-bar" style="display:none">
+      <span class="user-badge" id="user-name-badge"></span>
+      <a id="admin-link" href="/admin" style="display:none;color:var(--red);font-family:'Bangers',cursive;font-size:.9rem;letter-spacing:.1em;text-decoration:none;border:1px solid rgba(255,26,26,.4);padding:4px 10px;border-radius:2px">👑 COMMAND</a>
+      <button class="logout-btn" onclick="logout()">RETREAT</button>
+    </div>
+    <div id="auth-links"><a href="/login">LOGIN</a><a href="/register">REGISTER</a></div>
+  </nav>
+</header>
+
+<!-- Copy toast -->
+<div class="copy-toast" id="copy-toast">📋 INVITE CODE COPIED!</div>
+
+<div class="section" style="padding-top:2.5rem">
+  <div style="text-align:center;margin-bottom:2rem">
+    <div style="font-family:'Bangers',cursive;font-size:2.5rem;letter-spacing:.2em;background:linear-gradient(135deg,#fff,var(--yellow),var(--orange));-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-shadow:none;filter:drop-shadow(0 0 15px #ff6a0055)">⚔ CTF TEAMS ⚔</div>
+    <div style="color:#806040;font-size:.85rem;letter-spacing:.2em;margin-top:.35rem">Up to 5 members per team</div>
+  </div>
+
+  <!-- My Team Banner -->
+  <div id="my-team-banner" style="display:none" class="my-team-banner">
+    <span style="font-size:1.4rem">🛡</span>
+    <span id="my-team-name-display">YOUR TEAM</span>
+    <span style="color:#ff9944;font-size:.8rem;margin-left:.25rem" id="my-team-role-display"></span>
+    <span style="margin-left:auto;font-size:.8rem;color:#c8a878;font-family:'Rajdhani',sans-serif;font-weight:600">SCROLL DOWN TO SEE YOUR TEAM CARD</span>
+  </div>
+
+  <!-- Action panels row -->
+  <div id="action-area" style="display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-bottom:2rem">
+
+    <!-- Create Team -->
+    <div class="team-action-panel" id="panel-create">
+      <div style="font-family:'Bangers',cursive;font-size:1.3rem;color:var(--orange);letter-spacing:.15em;margin-bottom:1rem">🐉 REGISTER A NEW TEAM</div>
+
+      <div style="margin-bottom:.9rem">
+        <label style="display:block;font-size:.68rem;color:#c8a878;letter-spacing:.18em;margin-bottom:.35rem;font-weight:700;text-transform:uppercase">TEAM NAME</label>
+        <input id="new-team-name" type="text" maxlength="24" placeholder="Enter team name..." style="width:100%;padding:.6rem .9rem;background:rgba(255,106,0,.05);border:1px solid rgba(255,106,0,.3);color:#f5e6c8;font-family:'Share Tech Mono',monospace;font-size:.88rem;border-radius:2px;outline:none;transition:all .2s" onfocus="this.style.borderColor='var(--orange)'" onblur="this.style.borderColor='rgba(255,106,0,.3)'" />
+      </div>
+
+      <div style="margin-bottom:.9rem">
+        <label style="display:block;font-size:.68rem;color:#c8a878;letter-spacing:.18em;margin-bottom:.35rem;font-weight:700;text-transform:uppercase">YOUR PIXEL AVATAR</label>
+        <div class="avatar-picker" id="avatar-picker-create">
+          <div class="avatar-option selected" data-avatar="🥷" onclick="selectAvatar(this,'create')">🥷</div>
+          <div class="avatar-option" data-avatar="🤖" onclick="selectAvatar(this,'create')">🤖</div>
+          <div class="avatar-option" data-avatar="🐉" onclick="selectAvatar(this,'create')">🐉</div>
+          <div class="avatar-option" data-avatar="💀" onclick="selectAvatar(this,'create')">💀</div>
+          <div class="avatar-option" data-avatar="👾" onclick="selectAvatar(this,'create')">👾</div>
+          <div class="avatar-option" data-avatar="😈" onclick="selectAvatar(this,'create')">😈</div>
+          <div class="avatar-option" data-avatar="👻" onclick="selectAvatar(this,'create')">👻</div>
+          <div class="avatar-option" data-avatar="🐺" onclick="selectAvatar(this,'create')">🐺</div>
+          <div class="avatar-option" data-avatar="🐍" onclick="selectAvatar(this,'create')">🐍</div>
+          <div class="avatar-option" data-avatar="🦅" onclick="selectAvatar(this,'create')">🦅</div>
+          <div class="avatar-option" data-avatar="🐻" onclick="selectAvatar(this,'create')">🐻</div>
+          <div class="avatar-option" data-avatar="🦁" onclick="selectAvatar(this,'create')">🦁</div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:.9rem">
+        <label style="display:block;font-size:.68rem;color:#c8a878;letter-spacing:.18em;margin-bottom:.35rem;font-weight:700;text-transform:uppercase">TEAM AURA</label>
+        <div class="aura-picker" id="aura-picker-create">
+          <div class="aura-swatch selected" data-aura="inferno" data-from="#ff4500" data-to="#ff0080" style="background:linear-gradient(135deg,#ff4500,#ff0080)" onclick="selectAura(this,'create')"><span class="aura-swatch-label">INFERNO</span></div>
+          <div class="aura-swatch" data-aura="venom" data-from="#00ff88" data-to="#00ccff" style="background:linear-gradient(135deg,#00ff88,#00ccff)" onclick="selectAura(this,'create')"><span class="aura-swatch-label">VENOM</span></div>
+          <div class="aura-swatch" data-aura="void" data-from="#8b00ff" data-to="#ff00ff" style="background:linear-gradient(135deg,#8b00ff,#ff00ff)" onclick="selectAura(this,'create')"><span class="aura-swatch-label">VOID</span></div>
+          <div class="aura-swatch" data-aura="frost" data-from="#00d4ff" data-to="#0066ff" style="background:linear-gradient(135deg,#00d4ff,#0066ff)" onclick="selectAura(this,'create')"><span class="aura-swatch-label">FROST</span></div>
+          <div class="aura-swatch" data-aura="solar" data-from="#ffd700" data-to="#ff8c00" style="background:linear-gradient(135deg,#ffd700,#ff8c00)" onclick="selectAura(this,'create')"><span class="aura-swatch-label">SOLAR</span></div>
+          <div class="aura-swatch" data-aura="shadow" data-from="#555555" data-to="#aaaaaa" style="background:linear-gradient(135deg,#555,#aaa)" onclick="selectAura(this,'create')"><span class="aura-swatch-label">SHADOW</span></div>
+          <div class="aura-swatch" data-aura="blood" data-from="#cc0000" data-to="#660000" style="background:linear-gradient(135deg,#cc0000,#660000)" onclick="selectAura(this,'create')"><span class="aura-swatch-label">BLOOD</span></div>
+          <div class="aura-swatch" data-aura="aurora" data-from="#ff6ec7" data-to="#ffe600" style="background:linear-gradient(135deg,#ff6ec7,#ffe600)" onclick="selectAura(this,'create')"><span class="aura-swatch-label">AURORA</span></div>
+        </div>
+      </div>
+
+      <button class="btn btn-ki btn-full" id="create-btn" onclick="createTeam()" style="margin-top:.25rem">⚔ REGISTER TEAM</button>
+      <div id="create-msg" style="margin-top:.5rem;font-size:.85rem;display:none"></div>
+    </div>
+
+    <!-- Join Team -->
+    <div class="team-action-panel" id="panel-join">
+      <div style="font-family:'Bangers',cursive;font-size:1.3rem;color:var(--orange);letter-spacing:.15em;margin-bottom:1rem">⚡ JOIN A TEAM</div>
+
+      <div style="margin-bottom:.9rem">
+        <label style="display:block;font-size:.68rem;color:#c8a878;letter-spacing:.18em;margin-bottom:.35rem;font-weight:700;text-transform:uppercase">INVITE CODE</label>
+        <input id="invite-code-input" type="text" maxlength="8" placeholder="e.g. DBZ4EVER" style="width:100%;padding:.6rem .9rem;background:rgba(255,106,0,.05);border:1px solid rgba(255,106,0,.3);color:#ffd700;font-family:'Share Tech Mono',monospace;font-size:1rem;border-radius:2px;outline:none;transition:all .2s;letter-spacing:.2em;text-transform:uppercase" onfocus="this.style.borderColor='var(--orange)'" onblur="this.style.borderColor='rgba(255,106,0,.3)'" oninput="this.value=this.value.toUpperCase()"/>
+      </div>
+
+      <div style="margin-bottom:.9rem">
+        <label style="display:block;font-size:.68rem;color:#c8a878;letter-spacing:.18em;margin-bottom:.35rem;font-weight:700;text-transform:uppercase">YOUR PIXEL AVATAR</label>
+        <div class="avatar-picker" id="avatar-picker-join">
+          <div class="avatar-option selected" data-avatar="🥷" onclick="selectAvatar(this,'join')">🥷</div>
+          <div class="avatar-option" data-avatar="🤖" onclick="selectAvatar(this,'join')">🤖</div>
+          <div class="avatar-option" data-avatar="🐉" onclick="selectAvatar(this,'join')">🐉</div>
+          <div class="avatar-option" data-avatar="💀" onclick="selectAvatar(this,'join')">💀</div>
+          <div class="avatar-option" data-avatar="👾" onclick="selectAvatar(this,'join')">👾</div>
+          <div class="avatar-option" data-avatar="😈" onclick="selectAvatar(this,'join')">😈</div>
+          <div class="avatar-option" data-avatar="👻" onclick="selectAvatar(this,'join')">👻</div>
+          <div class="avatar-option" data-avatar="🐺" onclick="selectAvatar(this,'join')">🐺</div>
+          <div class="avatar-option" data-avatar="🐍" onclick="selectAvatar(this,'join')">🐍</div>
+          <div class="avatar-option" data-avatar="🦅" onclick="selectAvatar(this,'join')">🦅</div>
+          <div class="avatar-option" data-avatar="🐻" onclick="selectAvatar(this,'join')">🐻</div>
+          <div class="avatar-option" data-avatar="🦁" onclick="selectAvatar(this,'join')">🦁</div>
+        </div>
+      </div>
+
+      <button class="btn btn-full" id="join-btn" onclick="joinTeam()">⚡ JOIN TEAM</button>
+      <div id="join-msg" style="margin-top:.5rem;font-size:.85rem;display:none"></div>
+
+      <div style="margin-top:1.2rem;padding-top:1rem;border-top:1px solid rgba(255,106,0,.15)">
+        <div style="font-size:.7rem;color:#806040;letter-spacing:.15em;margin-bottom:.5rem;font-weight:700;text-transform:uppercase">— OR BROWSE ALL TEAMS BELOW —</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Teams Grid -->
+  <div class="section-title">🛡 ALL TEAMS</div>
+  <div class="teams-grid" id="teams-grid">
+    <div style="color:#806040;padding:2rem;font-family:'Bangers',cursive;font-size:1.2rem;grid-column:1/-1">⚡ LOADING TEAMS...</div>
+  </div>
+</div>
+
+<script>
+const token=localStorage.getItem('ctf_token'),myTeamUser=localStorage.getItem('ctf_team'),isAdmin=localStorage.getItem('ctf_is_admin')==='true';
+let selectedAuraCreate={from:'#ff4500',to:'#ff0080',name:'inferno'};
+let selectedAuraJoin={from:'#ff4500',to:'#ff0080',name:'inferno'};
+let selectedAvatarCreate='🥷', selectedAvatarJoin='🥷';
+let myCtfTeam=null;
+
+if(token&&myTeamUser){
+  document.getElementById('user-bar').style.display='flex';
+  document.getElementById('user-name-badge').textContent='⚡ '+myTeamUser;
+  document.getElementById('auth-links').style.display='none';
+  if(isAdmin)document.getElementById('admin-link').style.display='inline-block';
+}else{
+  // Hide action panels if not logged in
+  document.getElementById('action-area').innerHTML=`<div style="grid-column:1/-1;text-align:center;padding:2rem;color:#806040">
+    <div style="font-family:Bangers,cursive;font-size:1.3rem;color:var(--orange);margin-bottom:.75rem">⚡ LOGIN TO REGISTER OR JOIN A TEAM</div>
+    <a href="/login" class="btn btn-ki" style="text-decoration:none;display:inline-block;margin-right:.5rem">⚡ LOGIN</a>
+    <a href="/register" class="btn" style="text-decoration:none;display:inline-block">🐉 REGISTER</a>
+  </div>`;
+}
+
+function spawnKi(x,y){const p=document.createElement('div');p.className='ki-particle';const s=10+Math.random()*15;p.style.cssText=`left:${x-s/2}px;top:${y-s/2}px;width:${s}px;height:${s}px`;document.body.appendChild(p);setTimeout(()=>p.remove(),600)}
+document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('#characters-layer'))return;spawnKi(e.clientX,e.clientY)});
+
+function selectAvatar(el,panel){
+  document.querySelectorAll(`#avatar-picker-${panel} .avatar-option`).forEach(x=>x.classList.remove('selected'));
+  el.classList.add('selected');
+  if(panel==='create') selectedAvatarCreate=el.dataset.avatar;
+  else selectedAvatarJoin=el.dataset.avatar;
+}
+function selectAura(el,panel){
+  document.querySelectorAll(`#aura-picker-${panel} .aura-swatch`).forEach(x=>x.classList.remove('selected'));
+  el.classList.add('selected');
+  const obj={from:el.dataset.from,to:el.dataset.to,name:el.dataset.aura};
+  if(panel==='create') selectedAuraCreate=obj;
+  else selectedAuraJoin=obj;
+}
+
+async function api(path,opts={}){
+  const h={'Content-Type':'application/json'};
+  if(token)h['Authorization']=`Bearer ${token}`;
+  const r=await fetch('/api/v1'+path,{headers:h,...opts});
+  return r.json();
+}
+
+function showMsg(id,msg,ok){
+  const el=document.getElementById(id);el.style.display='block';
+  el.style.color=ok?'#ffd700':'#ff6666';el.textContent=msg;
+}
+
+async function createTeam(){
+  if(!token)return window.location.href='/login';
+  const name=document.getElementById('new-team-name').value.trim();
+  if(!name)return showMsg('create-msg','⚠ Enter a team name!',false);
+  const btn=document.getElementById('create-btn');btn.disabled=true;btn.textContent='⚡ FORGING...';
+  const r=await api('/teams/create',{method:'POST',body:JSON.stringify({name,aura_from:selectedAuraCreate.from,aura_to:selectedAuraCreate.to,aura_name:selectedAuraCreate.name,captain_avatar:selectedAvatarCreate})});
+  btn.disabled=false;btn.textContent='⚔ REGISTER TEAM';
+  if(r.success){showMsg('create-msg','🐉 Team registered! Refreshing...',true);setTimeout(()=>loadTeams(),1200);}
+  else showMsg('create-msg','💀 '+(r.message||'Error'),false);
+}
+
+async function joinTeam(){
+  if(!token)return window.location.href='/login';
+  const code=document.getElementById('invite-code-input').value.trim().toUpperCase();
+  if(!code)return showMsg('join-msg','⚠ Enter an invite code!',false);
+  const btn=document.getElementById('join-btn');btn.disabled=true;btn.textContent='⚡ JOINING...';
+  const r=await api('/teams/join',{method:'POST',body:JSON.stringify({invite_code:code,member_avatar:selectedAvatarJoin})});
+  btn.disabled=false;btn.textContent='⚡ JOIN TEAM';
+  if(r.success){showMsg('join-msg','⚡ Joined! Refreshing...',true);setTimeout(()=>loadTeams(),1200);}
+  else showMsg('join-msg','💀 '+(r.message||'Error'),false);
+}
+
+async function leaveTeam(teamId){
+  if(!confirm('Leave this team?'))return;
+  const r=await api('/teams/leave',{method:'POST',body:JSON.stringify({team_id:teamId})});
+  if(r.success)loadTeams();else alert(r.message||'Error');
+}
+
+async function kickMember(teamId,memberName){
+  if(!confirm(`Kick ${memberName} from team?`))return;
+  const r=await api('/teams/kick',{method:'POST',body:JSON.stringify({team_id:teamId,member:memberName})});
+  if(r.success)loadTeams();else alert(r.message||'Error');
+}
+
+async function disbandTeam(teamId){
+  if(!confirm('DISBAND this team? This cannot be undone!'))return;
+  const r=await api('/teams/disband',{method:'POST',body:JSON.stringify({team_id:teamId})});
+  if(r.success)loadTeams();else alert(r.message||'Error');
+}
+
+function copyCode(code){
+  navigator.clipboard.writeText(code).catch(()=>{});
+  const t=document.getElementById('copy-toast');t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2000);
+}
+
+function hexToRgb(hex){const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return`${r},${g},${b}`}
+
+function renderTeamCard(team){
+  const isMyTeam=myTeamUser&&team.members&&team.members.some(m=>m.name===myTeamUser);
+  const isCaptain=myTeamUser&&team.captain===myTeamUser;
+  const auraFrom=team.aura_from||'#ff6a00', auraTo=team.aura_to||'#ffd700';
+  const rgb=hexToRgb(auraFrom);
+  const MAX=5;
+  const memberCount=team.members?team.members.length:0;
+
+  // Build avatar row (captain first, then members)
+  let avatarHTML='';
+  if(team.members){
+    const captain=team.members.find(m=>m.name===team.captain);
+    const rest=team.members.filter(m=>m.name!==team.captain);
+    const ordered=[...(captain?[captain]:[]),...rest];
+    avatarHTML=ordered.map((m,i)=>`<div class="team-avatar-bubble${i===0?' captain':''}" title="${m.name}${i===0?' (Captain)':''}">${m.avatar||'🥷'}</div>`).join('');
+  }
+
+  // Size pips
+  let pipsHTML='<div class="team-size-bar">';
+  for(let i=0;i<MAX;i++) pipsHTML+=`<div class="size-pip${i<memberCount?' filled':''}"></div>`;
+  pipsHTML+='</div>';
+
+  // Member rows
+  let memberRows='';
+  if(team.members){
+    team.members.forEach(m=>{
+      const isCap=m.name===team.captain;
+      const canKick=isCaptain&&!isCap&&m.name!==myTeamUser;
+      memberRows+=`<div class="team-member-row">
+        <div class="member-avatar">${m.avatar||'🥷'}</div>
+        <div class="member-name">${m.name}</div>
+        <span class="member-badge ${isCap?'captain':'member'}">${isCap?'CAPTAIN':'MEMBER'}</span>
+        ${canKick?`<button class="member-kick-btn" onclick="kickMember('${team.id}','${m.name}')" title="Kick">✕</button>`:''}
+      </div>`;
+    });
+    // Empty slots
+    for(let i=memberCount;i<MAX;i++){
+      memberRows+=`<div class="team-slot-empty">· Empty slot ${i+1}</div>`;
+    }
+  }
+
+  // Action buttons
+  let actions='';
+  if(isMyTeam){
+    if(isCaptain) actions+=`<button class="btn btn-sm btn-red" style="margin-top:.6rem;width:100%" onclick="disbandTeam('${team.id}')">💀 DISBAND TEAM</button>`;
+    else actions+=`<button class="btn btn-sm" style="margin-top:.6rem;width:100%;border-color:#c8a878;color:#c8a878" onclick="leaveTeam('${team.id}')">🚪 LEAVE TEAM</button>`;
+  }
+
+  const cardStyle=`--aura-from:${auraFrom};--aura-to:${auraTo};--aura-r:${rgb.split(',')[0]};--aura-g:${rgb.split(',')[1]};--aura-b:${rgb.split(',')[2]}`;
+  const myGlow=isMyTeam?'box-shadow:0 0 40px rgba(255,215,0,.25),0 0 80px rgba(255,106,0,.1);':'';
+
+  return `<div class="team-card" style="${cardStyle};${myGlow}" id="teamcard-${team.id}">
+    ${isMyTeam?'<div style="position:absolute;top:8px;left:50%;transform:translateX(-50%);font-family:Bangers,cursive;font-size:.65rem;letter-spacing:.2em;color:#ffd700;z-index:3;background:rgba(0,0,0,.7);padding:2px 8px;border-radius:2px;border:1px solid rgba(255,215,0,.3)">★ YOUR TEAM ★</div>':''}
+    <div class="team-card-banner">
+      <div class="team-banner-tag">TEAM · ${memberCount}/${MAX} MEMBERS</div>
+      <div class="team-banner-name">${team.name}</div>
+      <div class="team-avatar-row">${avatarHTML}</div>
+    </div>
+    <div class="team-card-body">
+      <div class="team-invite-label">INVITE CODE</div>
+      <div class="team-invite-code" onclick="copyCode('${team.invite_code}')" title="Click to copy">
+        <span>${team.invite_code}</span>
+      </div>
+      ${pipsHTML}
+      <div class="team-member-list" style="margin-top:.6rem">${memberRows}</div>
+      <div class="team-score-row">
+        <div class="team-score-box"><div class="team-score-val">${(team.total_score||0).toLocaleString()}</div><div class="team-score-lbl">⚡ Power</div></div>
+        <div class="team-score-box"><div class="team-score-val">${team.total_solves||0}</div><div class="team-score-lbl">⚔ Solves</div></div>
+        <div class="team-score-box"><div class="team-score-val">${memberCount}</div><div class="team-score-lbl">👥 Size</div></div>
+      </div>
+      ${actions}
+    </div>
+  </div>`;
+}
+
+async function loadTeams(){
+  const r=await api('/teams');
+  const grid=document.getElementById('teams-grid');
+  if(!r.teams||!r.teams.length){grid.innerHTML='<div style="color:#806040;padding:2rem;font-family:Bangers,cursive;grid-column:1/-1">No teams yet — register the first one!</div>';return;}
+
+  // Find my team
+  myCtfTeam=null;
+  if(myTeamUser){
+    myCtfTeam=r.teams.find(t=>t.members&&t.members.some(m=>m.name===myTeamUser))||null;
+  }
+
+  // My team banner
+  const bannerEl=document.getElementById('my-team-banner');
+  if(myCtfTeam&&bannerEl){
+    bannerEl.style.display='flex';
+    document.getElementById('my-team-name-display').textContent=myCtfTeam.name.toUpperCase();
+    document.getElementById('my-team-role-display').textContent=myCtfTeam.captain===myTeamUser?'(Captain)':'(Member)';
+  }
+
+  // Sort: my team first, then by score
+  const sorted=r.teams.slice().sort((a,b)=>{
+    const aIsMe=a.members&&a.members.some(m=>m.name===myTeamUser);
+    const bIsMe=b.members&&b.members.some(m=>m.name===myTeamUser);
+    if(aIsMe&&!bIsMe)return -1;
+    if(!aIsMe&&bIsMe)return 1;
+    return (b.total_score||0)-(a.total_score||0);
+  });
+
+  grid.innerHTML=sorted.map(renderTeamCard).join('');
+
+  // Hide create/join panels if already in a team
+  if(myCtfTeam&&token){
+    const area=document.getElementById('action-area');
+    if(area) area.style.display='none';
+  }
+}
+
+function logout(){fetch('/api/v1/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}});localStorage.clear();window.location.href='/login'}
+
+loadTeams();
+setInterval(loadTeams,30000);
+</script>
+<script>""" + PIXEL_CHARS_JS + """</script>
+</body></html>"""
 
 LOGIN_HTML = """<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><title>Login - {{ ctf_name }}</title>
@@ -1513,7 +1366,7 @@ ADMIN_HTML = """<!DOCTYPE html>
 <header class="header">
   <a class="logo" href="/">{{ ctf_name }}<span> CTF</span></a>
   <nav>
-    <a href="/">ARENA</a><a href="/admin" class="active">COMMAND</a>
+    <a href="/">ARENA</a><a href="/teams">🛡 TEAMS</a><a href="/admin" class="active">COMMAND</a>
     <span class="power-level">👑 {{ admin_name }}</span>
     <button onclick="logout()" class="logout-btn">RETREAT</button>
   </nav>
@@ -1532,6 +1385,7 @@ ADMIN_HTML = """<!DOCTYPE html>
     <div class="tab active" onclick="switchTab('teams')" id="tab-teams">⚔ WARRIORS</div>
     <div class="tab" onclick="switchTab('challenges')" id="tab-challenges">🐉 CHALLENGES</div>
     <div class="tab" onclick="switchTab('solves')" id="tab-solves">⚡ BATTLE LOG</div>
+    <div class="tab" onclick="switchTab('esports')" id="tab-esports">🛡 TEAMS</div>
   </div>
   <div class="panel active" id="panel-teams">
     <div class="section-title">⚔ ALL WARRIORS</div>
@@ -1546,6 +1400,10 @@ ADMIN_HTML = """<!DOCTYPE html>
     <div class="section-title">⚡ BATTLE LOG</div>
     <table><thead><tr><th>TIME</th><th>WARRIOR</th><th>CHALLENGE</th><th>POWER</th><th>FIRST BLOOD</th></tr></thead><tbody id="solves-body"></tbody></table>
   </div>
+  <div class="panel" id="panel-esports">
+    <div class="section-title">🛡 ALL TEAMS</div>
+    <table><thead><tr><th>TEAM</th><th>CAPTAIN</th><th>MEMBERS</th><th>POWER</th><th>INVITE CODE</th><th>AURA</th><th>ACTIONS</th></tr></thead><tbody id="esports-body"></tbody></table>
+  </div>
 </div>
 <script>
 const token=localStorage.getItem('ctf_token'),isAdmin=localStorage.getItem('ctf_is_admin')==='true';
@@ -1553,7 +1411,7 @@ if(!token||!isAdmin)window.location.href='/login';
 let allTeams=[];
 async function api(path,opts={}){const h={'Content-Type':'application/json','Authorization':`Bearer ${token}`};const r=await fetch('/api/v1'+path,{headers:h,...opts});if(r.status===401||r.status===403){window.location.href='/login';return{}}return r.json()}
 async function loadStats(){
-  const[teams,challenges,feed]=await Promise.all([api('/admin/teams'),api('/challenges'),api('/feed')]);
+  const[teams,challenges,feed,esports]=await Promise.all([api('/admin/teams'),api('/challenges'),api('/feed'),api('/teams')]);
   allTeams=teams.teams||[];
   document.getElementById('stat-teams').textContent=allTeams.length;
   document.getElementById('stat-challenges').textContent=(challenges.challenges||[]).length;
@@ -1562,6 +1420,16 @@ async function loadStats(){
   renderTeams(allTeams);
   document.getElementById('challenges-body').innerHTML=(challenges.challenges||[]).map(c=>`<tr><td style="font-family:'Bangers',cursive">${c.name}</td><td><span class="badge badge-blue">${c.category}</span></td><td style="color:var(--yellow);font-family:'Bangers',cursive;font-size:1.1rem">${c.points}</td><td>${c.difficulty}</td><td>${c.solves}</td><td style="color:#c8a878">${c.hints?.length||0}</td></tr>`).join('');
   document.getElementById('solves-body').innerHTML=(feed.events||[]).map(e=>`<tr><td style="color:#806040;font-size:.8rem">${e.timestamp}</td><td style="color:var(--yellow);font-weight:700">${e.team}</td><td>${e.challenge}</td><td style="color:var(--orange);font-family:'Bangers',cursive">+${e.points}</td><td>${e.first_blood?'🩸 FIRST BLOOD':''}</td></tr>`).join('');
+  const esportsTeams=esports.teams||[];
+  document.getElementById('esports-body').innerHTML=esportsTeams.map(t=>`<tr>
+    <td style="font-family:'Bangers',cursive;color:var(--yellow)">${t.name}</td>
+    <td style="color:#c8a878">${t.captain}</td>
+    <td>${(t.members||[]).map(m=>`${m.avatar||'🥷'}${m.name}`).join(', ')}</td>
+    <td style="color:var(--orange);font-family:'Bangers',cursive">${t.total_score||0}</td>
+    <td style="font-family:'Share Tech Mono',monospace;color:#ffd700;font-size:.85rem">${t.invite_code}</td>
+    <td><div style="width:40px;height:16px;border-radius:2px;background:linear-gradient(90deg,${t.aura_from||'#ff6a00'},${t.aura_to||'#ffd700'})"></div></td>
+    <td><button class="btn btn-sm btn-red" onclick="adminDisbandTeam('${t.id}')">DISBAND</button></td>
+  </tr>`).join('');
 }
 function renderTeams(teams){document.getElementById('teams-body').innerHTML=teams.map(t=>`<tr><td style="color:var(--yellow);font-family:'Bangers',cursive">${t.name}</td><td style="color:#806040;font-size:.8rem">${t.email}</td><td>${t.country||'-'}</td><td style="color:var(--orange);font-family:'Bangers',cursive;font-size:1.1rem">${t.score}</td><td>${t.solves}</td><td>${t.verified?'<span class="badge badge-green">VERIFIED</span>':'<span class="badge badge-yellow">UNVERIFIED</span>'}${t.banned?'<span class="badge badge-red" style="margin-left:4px">BANNED</span>':''}</td><td style="display:flex;gap:4px"><button class="btn btn-sm ${t.banned?'btn-blue':'btn-red'}" onclick="${t.banned?`unbanTeam('${t.name}')`:`banTeam('${t.name}')`}">${t.banned?'UNBAN':'BAN'}</button><button class="btn btn-sm" onclick="resetScore('${t.name}')">RESET</button><button class="btn btn-sm btn-red" onclick="deleteTeam('${t.name}')">DELETE</button></td></tr>`).join('')}
 function filterTeams(){const q=document.getElementById('search').value.toLowerCase();renderTeams(allTeams.filter(t=>t.name.toLowerCase().includes(q)||t.email.toLowerCase().includes(q)))}
@@ -1569,6 +1437,7 @@ async function banTeam(n){if(!confirm(`Ban "${n}"?`))return;await api('/admin/te
 async function unbanTeam(n){if(!confirm(`Unban "${n}"?`))return;await api('/admin/teams/unban',{method:'POST',body:JSON.stringify({team_name:n})});loadStats()}
 async function resetScore(n){if(!confirm(`Reset score for "${n}"?`))return;await api('/admin/teams/reset',{method:'POST',body:JSON.stringify({team_name:n})});loadStats()}
 async function deleteTeam(n){if(!confirm(`DELETE "${n}"?`))return;await api('/admin/teams/delete',{method:'POST',body:JSON.stringify({team_name:n})});loadStats()}
+async function adminDisbandTeam(id){if(!confirm('Disband this team?'))return;await api('/teams/admin/disband',{method:'POST',body:JSON.stringify({team_id:id})});loadStats()}
 function switchTab(n){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.getElementById('tab-'+n).classList.add('active');document.getElementById('panel-'+n).classList.add('active')}
 function logout(){fetch('/api/v1/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}});localStorage.clear();window.location.href='/login'}
 loadStats();setInterval(loadStats,30000);
@@ -1600,6 +1469,7 @@ INDEX_HTML = """<!DOCTYPE html>
     <a href="#" onclick="switchTab('challenges')">⚔ CHALLENGES</a>
     <a href="#" onclick="switchTab('scoreboard')">🏆 POWER RANKS</a>
     <a href="#" onclick="switchTab('feed')">⚡ BATTLE FEED</a>
+    <a href="/teams">🛡 TEAMS</a>
     <div class="user-bar" id="user-bar" style="display:none">
       <span class="user-badge" id="user-name"></span>
       <a id="admin-link" href="/admin" style="display:none;color:var(--red);font-family:'Bangers',cursive;font-size:.9rem;letter-spacing:.1em;text-decoration:none;border:1px solid rgba(255,26,26,.4);padding:4px 10px;border-radius:2px">👑 COMMAND</a>
@@ -1807,6 +1677,15 @@ body{background:radial-gradient(ellipse at center,#1a0800,#0a0300 60%,#050100);d
 </div></body></html>"""
 
 
+# ─────────────────────────────────────────────────────────────────────
+# HELPER: Generate invite code
+# ─────────────────────────────────────────────────────────────────────
+
+def generate_invite_code(length=8):
+    alphabet = string.ascii_uppercase + string.digits
+    return ''.join(secrets.choice(alphabet) for _ in range(length))
+
+
 def create_app(config: Config = None) -> Flask:
     config = config or Config()
     app = Flask(__name__)
@@ -1816,6 +1695,34 @@ def create_app(config: Config = None) -> Flask:
     validator = FlagValidator(config)
     scoreboard = Scoreboard(config)
     auth = AuthManager(config)
+
+    # ── Ensure ctf_team_registrations table exists ─────────────────────────────
+    try:
+        manager.db.execute("""
+            CREATE TABLE IF NOT EXISTS esports_teams (
+                id TEXT PRIMARY KEY,
+                name TEXT UNIQUE NOT NULL,
+                captain TEXT NOT NULL,
+                invite_code TEXT UNIQUE NOT NULL,
+                aura_from TEXT DEFAULT '#ff6a00',
+                aura_to TEXT DEFAULT '#ffd700',
+                aura_name TEXT DEFAULT 'inferno',
+                created_at INTEGER DEFAULT (strftime('%s','now'))
+            )
+        """)
+        manager.db.execute("""
+            CREATE TABLE IF NOT EXISTS esports_members (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                team_id TEXT NOT NULL,
+                member TEXT NOT NULL,
+                avatar TEXT DEFAULT '🥷',
+                joined_at INTEGER DEFAULT (strftime('%s','now')),
+                UNIQUE(member),
+                FOREIGN KEY(team_id) REFERENCES esports_teams(id) ON DELETE CASCADE
+            )
+        """)
+    except Exception:
+        pass  # Tables may already exist
 
     def require_json(f):
         @wraps(f)
@@ -1846,6 +1753,38 @@ def create_app(config: Config = None) -> Flask:
             return f(*args, **kwargs)
         return wrapper
 
+    # ── Helper: build team dict ────────────────────────────────────────
+    def build_team_dict(row):
+        """row = (id, name, captain, invite_code, aura_from, aura_to, aura_name)"""
+        team_id, name, captain, invite_code, aura_from, aura_to, aura_name = row
+        members_raw = manager.db.fetchall(
+            "SELECT member, avatar FROM esports_members WHERE team_id=? ORDER BY joined_at ASC",
+            (team_id,)
+        )
+        members = [{"name": m[0], "avatar": m[1]} for m in (members_raw or [])]
+        # Aggregate score/solves from auth
+        total_score = 0
+        total_solves = 0
+        for m in members:
+            info = auth.get_team_info(m["name"])
+            if info:
+                total_score += info.get("score", 0)
+                total_solves += info.get("solves", 0)
+        return {
+            "id": team_id,
+            "name": name,
+            "captain": captain,
+            "invite_code": invite_code,
+            "aura_from": aura_from,
+            "aura_to": aura_to,
+            "aura_name": aura_name,
+            "members": members,
+            "total_score": total_score,
+            "total_solves": total_solves,
+        }
+
+    # ── Page routes ────────────────────────────────────────────────────
+
     @app.route("/")
     def index():
         return render_template_string(INDEX_HTML,
@@ -1859,6 +1798,10 @@ def create_app(config: Config = None) -> Flask:
     @app.route("/register")
     def register_page():
         return render_template_string(REGISTER_HTML, ctf_name=config.ctf_name)
+
+    @app.route("/teams")
+    def teams_page():
+        return render_template_string(TEAM_HTML, ctf_name=config.ctf_name)
 
     @app.route("/verify/<token>")
     def verify_email(token):
@@ -1886,6 +1829,8 @@ def create_app(config: Config = None) -> Flask:
             rank=rank, rank_emoji=rank_emojis.get(rank, "🏅"),
             score=score, solves=solves,
             date=datetime.now().strftime("%B %d, %Y"), cert_id=cert_id)
+
+    # ── Auth API ───────────────────────────────────────────────────────
 
     @app.route("/api/v1/auth/register", methods=["POST"])
     @require_json
@@ -1926,6 +1871,8 @@ def create_app(config: Config = None) -> Flask:
         except Exception as e:
             traceback.print_exc()
             return jsonify({"success": False, "message": f"Server error: {str(e)}"}), 500
+
+    # ── Challenge API ──────────────────────────────────────────────────
 
     @app.route("/api/v1/challenges")
     def api_challenges():
@@ -2000,6 +1947,8 @@ def create_app(config: Config = None) -> Flask:
             traceback.print_exc()
             return jsonify({"success": False, "message": f"Server error: {str(e)}"}), 500
 
+    # ── Scoreboard API ─────────────────────────────────────────────────
+
     @app.route("/api/v1/scoreboard")
     def api_scoreboard():
         try:
@@ -2043,6 +1992,8 @@ def create_app(config: Config = None) -> Flask:
             traceback.print_exc()
             return jsonify({"solves": [], "error": str(e)}), 500
 
+    # ── Admin API ──────────────────────────────────────────────────────
+
     @app.route("/api/v1/admin/teams")
     @require_admin
     def api_admin_teams():
@@ -2075,6 +2026,223 @@ def create_app(config: Config = None) -> Flask:
     def api_reset():
         auth.reset_team_score(request.get_json().get("team_name",""))
         return jsonify({"success": True})
+
+    # ── ESPORTS TEAM API ───────────────────────────────────────────────
+
+    @app.route("/api/v1/teams")
+    def api_list_esports_teams():
+        """List all CTF teams."""
+        try:
+            rows = manager.db.fetchall(
+                "SELECT id, name, captain, invite_code, aura_from, aura_to, aura_name FROM esports_teams ORDER BY created_at DESC"
+            )
+            teams = [build_team_dict(r) for r in (rows or [])]
+            return jsonify({"teams": teams})
+        except Exception as e:
+            traceback.print_exc()
+            return jsonify({"teams": [], "error": str(e)}), 500
+
+    @app.route("/api/v1/teams/create", methods=["POST"])
+    @require_json
+    @require_auth
+    def api_create_esports_team():
+        """Create a new CTF team. Logged-in user becomes captain."""
+        try:
+            user = get_current_team()
+            d = request.get_json()
+            name = d.get("name","").strip()
+            if not name or len(name) < 2:
+                return jsonify({"success": False, "message": "Team name must be at least 2 characters"})
+            if len(name) > 24:
+                return jsonify({"success": False, "message": "Team name too long (max 24)"})
+
+            # Check user not already in a team
+            existing = manager.db.fetchone(
+                "SELECT team_id FROM esports_members WHERE member=?", (user,)
+            )
+            if existing:
+                return jsonify({"success": False, "message": "You are already in a team! Leave it first. Leave it first."})
+
+            # Check name not taken
+            taken = manager.db.fetchone("SELECT id FROM esports_teams WHERE name=?", (name,))
+            if taken:
+                return jsonify({"success": False, "message": "Team name already taken!"})
+
+            import uuid
+            team_id = str(uuid.uuid4())[:12].replace("-","")
+            invite_code = generate_invite_code(8)
+            aura_from = d.get("aura_from","#ff6a00")
+            aura_to   = d.get("aura_to","#ffd700")
+            aura_name = d.get("aura_name","inferno")
+            captain_avatar = d.get("captain_avatar","🥷")
+
+            manager.db.execute(
+                "INSERT INTO esports_teams (id, name, captain, invite_code, aura_from, aura_to, aura_name) VALUES (?,?,?,?,?,?,?)",
+                (team_id, name, user, invite_code, aura_from, aura_to, aura_name)
+            )
+            manager.db.execute(
+                "INSERT INTO esports_members (team_id, member, avatar) VALUES (?,?,?)",
+                (team_id, user, captain_avatar)
+            )
+            return jsonify({"success": True, "message": f"Team '{name}' registered!", "team_id": team_id, "invite_code": invite_code})
+        except Exception as e:
+            traceback.print_exc()
+            return jsonify({"success": False, "message": f"Server error: {str(e)}"}), 500
+
+    @app.route("/api/v1/teams/join", methods=["POST"])
+    @require_json
+    @require_auth
+    def api_join_esports_team():
+        """Join a CTF team via invite code."""
+        try:
+            user = get_current_team()
+            d = request.get_json()
+            invite_code = d.get("invite_code","").strip().upper()
+            member_avatar = d.get("member_avatar","🥷")
+
+            # Already in a team?
+            existing = manager.db.fetchone(
+                "SELECT team_id FROM esports_members WHERE member=?", (user,)
+            )
+            if existing:
+                return jsonify({"success": False, "message": "You are already in a team! Leave it first."})
+
+            # Find team by code
+            row = manager.db.fetchone(
+                "SELECT id, name FROM esports_teams WHERE invite_code=?", (invite_code,)
+            )
+            if not row:
+                return jsonify({"success": False, "message": "Invalid invite code!"})
+
+            team_id, team_name = row
+
+            # Check size limit (max 5)
+            count = manager.db.fetchone(
+                "SELECT COUNT(*) FROM esports_members WHERE team_id=?", (team_id,)
+            )
+            if count and count[0] >= 5:
+                return jsonify({"success": False, "message": "Team is full! (max 5 members)"})
+
+            manager.db.execute(
+                "INSERT INTO esports_members (team_id, member, avatar) VALUES (?,?,?)",
+                (team_id, user, member_avatar)
+            )
+            return jsonify({"success": True, "message": f"Joined team '{team_name}'!"})
+        except Exception as e:
+            traceback.print_exc()
+            return jsonify({"success": False, "message": f"Server error: {str(e)}"}), 500
+
+    @app.route("/api/v1/teams/leave", methods=["POST"])
+    @require_json
+    @require_auth
+    def api_leave_esports_team():
+        """Leave your CTF team (captain cannot leave; must disband instead)."""
+        try:
+            user = get_current_team()
+            d = request.get_json()
+            team_id = d.get("team_id","")
+
+            # Check captain
+            cap = manager.db.fetchone(
+                "SELECT captain FROM esports_teams WHERE id=?", (team_id,)
+            )
+            if cap and cap[0] == user:
+                return jsonify({"success": False, "message": "Captains cannot leave — disband the team instead!"})
+
+            manager.db.execute(
+                "DELETE FROM esports_members WHERE team_id=? AND member=?", (team_id, user)
+            )
+            return jsonify({"success": True, "message": "Left the team."})
+        except Exception as e:
+            traceback.print_exc()
+            return jsonify({"success": False, "message": f"Server error: {str(e)}"}), 500
+
+    @app.route("/api/v1/teams/kick", methods=["POST"])
+    @require_json
+    @require_auth
+    def api_kick_member():
+        """Captain removes a member from the team."""
+        try:
+            user = get_current_team()
+            d = request.get_json()
+            team_id = d.get("team_id","")
+            target  = d.get("member","")
+
+            cap = manager.db.fetchone(
+                "SELECT captain FROM esports_teams WHERE id=?", (team_id,)
+            )
+            if not cap or cap[0] != user:
+                return jsonify({"success": False, "message": "Only the captain can remove members!"})
+            if target == user:
+                return jsonify({"success": False, "message": "Cannot kick yourself!"})
+
+            manager.db.execute(
+                "DELETE FROM esports_members WHERE team_id=? AND member=?", (team_id, target)
+            )
+            return jsonify({"success": True, "message": f"{target} has been removed from the team."})
+        except Exception as e:
+            traceback.print_exc()
+            return jsonify({"success": False, "message": f"Server error: {str(e)}"}), 500
+
+    @app.route("/api/v1/teams/disband", methods=["POST"])
+    @require_json
+    @require_auth
+    def api_disband_esports_team():
+        """Captain disbands the CTF team."""
+        try:
+            user = get_current_team()
+            d = request.get_json()
+            team_id = d.get("team_id","")
+
+            cap = manager.db.fetchone(
+                "SELECT captain FROM esports_teams WHERE id=?", (team_id,)
+            )
+            if not cap or cap[0] != user:
+                return jsonify({"success": False, "message": "Only the captain can disband the team!"})
+
+            manager.db.execute("DELETE FROM esports_members WHERE team_id=?", (team_id,))
+            manager.db.execute("DELETE FROM esports_teams WHERE id=?", (team_id,))
+            return jsonify({"success": True, "message": "Team disbanded."})
+        except Exception as e:
+            traceback.print_exc()
+            return jsonify({"success": False, "message": f"Server error: {str(e)}"}), 500
+
+    @app.route("/api/v1/teams/admin/disband", methods=["POST"])
+    @require_json
+    @require_admin
+    def api_admin_disband_team():
+        """Admin force-disbands any CTF team."""
+        try:
+            d = request.get_json()
+            team_id = d.get("team_id","")
+            manager.db.execute("DELETE FROM esports_members WHERE team_id=?", (team_id,))
+            manager.db.execute("DELETE FROM esports_teams WHERE id=?", (team_id,))
+            return jsonify({"success": True})
+        except Exception as e:
+            traceback.print_exc()
+            return jsonify({"success": False, "message": str(e)}), 500
+
+    @app.route("/api/v1/teams/my")
+    @require_auth
+    def api_my_esports_team():
+        """Get the CTF team the current user belongs to."""
+        try:
+            user = get_current_team()
+            row = manager.db.fetchone(
+                """SELECT et.id, et.name, et.captain, et.invite_code, et.aura_from, et.aura_to, et.aura_name
+                   FROM esports_teams et
+                   JOIN esports_members em ON et.id = em.team_id
+                   WHERE em.member=?""",
+                (user,)
+            )
+            if not row:
+                return jsonify({"team": None})
+            return jsonify({"team": build_team_dict(row)})
+        except Exception as e:
+            traceback.print_exc()
+            return jsonify({"team": None, "error": str(e)}), 500
+
+    # ── Error handlers ─────────────────────────────────────────────────
 
     @app.errorhandler(404)
     def not_found(e): return jsonify({"error": "Not found"}), 404
