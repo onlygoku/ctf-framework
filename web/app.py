@@ -1,5 +1,5 @@
 """
-Web App - CTF Platform - Dragon Ball Z Theme with Intro Animation
+Web App - CTF Platform - Dragon Ball Z Theme with Pixel Art Characters
 """
 
 import sys
@@ -19,1028 +19,1163 @@ from ctf_core.scoreboard import Scoreboard
 from ctf_core.auth import AuthManager
 
 # ─────────────────────────────────────────────────────────────────────
-# DBZ INTRO SEQUENCE
+# PIXEL ART CHARACTER SYSTEM
+# Each character is drawn with CSS box-shadow pixel art technique
 # ─────────────────────────────────────────────────────────────────────
-DBZ_INTRO = """
-<div id="dbz-intro" style="
-  position:fixed;inset:0;z-index:99999;
-  background:#000;
-  display:flex;flex-direction:column;
-  align-items:center;justify-content:center;
-  overflow:hidden;font-family:'Bangers',cursive;
-">
 
-  <!-- ── SKIP BUTTON ── -->
-  <button id="skip-btn" onclick="skipIntro()" style="
-    position:absolute;top:20px;right:20px;
-    background:transparent;border:1px solid rgba(255,106,0,.5);
-    color:rgba(255,106,0,.7);font-family:'Bangers',cursive;
-    font-size:.85rem;letter-spacing:.15em;padding:6px 14px;
-    cursor:pointer;border-radius:2px;z-index:10;
-    transition:all .2s;
-  " onmouseover="this.style.borderColor='#ff6a00';this.style.color='#ffd700'"
-     onmouseout="this.style.borderColor='rgba(255,106,0,.5)';this.style.color='rgba(255,106,0,.7)'">
+PIXEL_ART_CSS = """
+/* ── PIXEL ART BASE ── */
+.px { display:inline-block; width:4px; height:4px; position:relative; }
+.char-wrap {
+  position:absolute; bottom:0; cursor:pointer; pointer-events:auto;
+  image-rendering:pixelated; transform-origin:bottom center;
+}
+.char-canvas {
+  position:relative; width:48px; height:80px;
+  image-rendering:pixelated;
+}
+
+/* ── WALK ANIMATION ── */
+@keyframes walkBob  { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-3px)} }
+@keyframes runBob   { 0%,100%{transform:translateY(0)} 25%{transform:translateY(-5px)} 75%{transform:translateY(-2px)} }
+@keyframes idleBreath{ 0%,100%{transform:scaleY(1)} 50%{transform:scaleY(0.97)} }
+@keyframes jumpArc  { 0%{transform:translateY(0) rotate(0deg)} 40%{transform:translateY(-90px) rotate(-10deg)} 60%{transform:translateY(-90px) rotate(10deg)} 100%{transform:translateY(0) rotate(0deg)} }
+@keyframes powerUp  { 0%{filter:brightness(1)} 30%{filter:brightness(2) saturate(2)} 60%{filter:brightness(3) saturate(3)} 100%{filter:brightness(1)} }
+@keyframes ssjFlare { 0%,100%{box-shadow:0 0 20px #ffd700, 0 0 40px #ff6a00} 50%{box-shadow:0 0 40px #fff, 0 0 80px #ffd700, 0 0 120px #ff6a00} }
+@keyframes fightKick{ 0%{transform:rotate(0deg)} 30%{transform:rotate(-15deg) translateX(8px)} 70%{transform:rotate(15deg) translateX(-8px)} 100%{transform:rotate(0deg)} }
+@keyframes chargeKi { 0%{opacity:0.4;transform:scale(0.8)} 50%{opacity:1;transform:scale(1.1)} 100%{opacity:0.4;transform:scale(0.8)} }
+@keyframes floatUp  { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-12px)} }
+@keyframes legLeft  { 0%,100%{transform:rotate(20deg)} 50%{transform:rotate(-20deg)} }
+@keyframes legRight { 0%,100%{transform:rotate(-20deg)} 50%{transform:rotate(20deg)} }
+@keyframes armSwing { 0%,100%{transform:rotate(-25deg)} 50%{transform:rotate(25deg)} }
+@keyframes hairFlap { 0%,100%{transform:skewX(0deg)} 50%{transform:skewX(5deg)} }
+@keyframes auraRing { 0%{transform:translateX(-50%) scaleX(0.7);opacity:0.3} 100%{transform:translateX(-50%) scaleX(1.1);opacity:0.8} }
+@keyframes kiOrb    { 0%,100%{transform:scale(1) rotate(0deg);opacity:0.8} 50%{transform:scale(1.3) rotate(180deg);opacity:1} }
+@keyframes explosion{ 0%{transform:scale(0);opacity:1} 100%{transform:scale(4);opacity:0} }
+@keyframes kiBlast  { 0%{transform:scale(0);opacity:1} 100%{transform:scale(2.5);opacity:0} }
+@keyframes screenShake{ 0%,100%{transform:translate(0,0)} 20%{transform:translate(-4px,2px)} 40%{transform:translate(4px,-2px)} 60%{transform:translate(-3px,3px)} 80%{transform:translate(3px,-1px)} }
+
+/* ── AURA ── */
+.char-aura {
+  position:absolute; bottom:-6px; left:50%;
+  border-radius:50%; filter:blur(10px);
+  animation:auraRing 1.2s ease-in-out infinite alternate;
+  pointer-events:none; z-index:0;
+}
+/* ── KI ORB ── */
+.ki-orb {
+  position:absolute; border-radius:50%;
+  background:radial-gradient(circle at 35% 35%,#fff,currentColor);
+  animation:kiOrb 1.8s ease-in-out infinite;
+  pointer-events:none;
+}
+/* ── SPEECH BUBBLE ── */
+.speech-bubble {
+  position:absolute; bottom:calc(100% + 8px); left:50%;
+  transform:translateX(-50%);
+  background:rgba(5,2,0,.96); border:2px solid #ff6a00;
+  border-radius:8px; padding:5px 10px;
+  font-family:'Bangers',cursive; font-size:.85rem;
+  letter-spacing:.06em; color:#ffd700;
+  white-space:nowrap; opacity:0; transition:opacity .25s;
+  pointer-events:none; z-index:20;
+  box-shadow:0 0 14px rgba(255,106,0,.4);
+}
+.speech-bubble::after {
+  content:''; position:absolute; top:100%; left:50%;
+  transform:translateX(-50%);
+  border:6px solid transparent; border-top-color:#ff6a00;
+}
+.char-name {
+  text-align:center; font-family:'Bangers',cursive;
+  font-size:.75rem; letter-spacing:.12em;
+  margin-top:2px; position:relative; z-index:2;
+}
+"""
+
+PIXEL_CHARS_JS = r"""
+(function(){
+'use strict';
+
+// ── PIXEL ART RENDERER ──────────────────────────────────────────────
+// Each character defined as a 12x20 grid of colored pixels
+// Colors: 0=transparent, other=hex string key in palette
+
+const PAL = {
+  // Shared
+  W:'#fff', SK:'#f5c97a', SK2:'#e8a85a', DK:'#1a0800',
+  BK:'#111', OR:'#ff6a00', YL:'#ffd700', RD:'#ff2200',
+  BL:'#1a44cc', PU:'#7700cc', GR:'#116611', GY:'#888',
+  LG:'#22aa33', PK:'#ff44cc', WH:'#eeeeff', NV:'#001166',
+  OG:'#ff8800', TL:'#00bbaa', SL:'#ccccdd', CY:'#00ddff',
+};
+
+// 12-wide x 20-tall pixel maps  (row by row, top to bottom)
+// Values are palette keys or 0 (transparent)
+const SPRITES = {
+
+goku:[
+  // Hair (spiky, black)
+  [0,0,'BK','BK','BK','BK','BK','BK','BK',0,0,0],
+  [0,'BK','BK','BK','BK','BK','BK','BK','BK','BK',0,0],
+  ['BK','BK','BK','SK','SK','SK','SK','SK','BK','BK','BK',0],
+  // Face
+  [0,'BK','SK','SK','SK','SK','SK','SK','SK','BK',0,0],
+  [0,'SK','SK','W','BK','SK','W','BK','SK','SK',0,0], // eyes
+  [0,'SK','SK','SK','SK','SK','SK','SK','SK','SK',0,0],
+  [0,'SK','SK','SK','OR','SK','SK','OR','SK','SK',0,0], // cheeks/nose
+  [0,0,'SK','SK','SK','SK','SK','SK','SK',0,0,0],
+  // Neck + shoulders
+  [0,0,0,'SK','SK','SK','SK','SK',0,0,0,0],
+  // Gi top (orange)
+  [0,'OR','OR','OR','OR','OR','OR','OR','OR','OR',0,0],
+  [0,'OR','BL','OR','OR','OR','OR','OR','BL','OR',0,0], // belt detail
+  ['OR','OR','OR','OR','OR','OR','OR','OR','OR','OR','OR',0],
+  // Belt (blue)
+  [0,'BL','BL','BL','BL','BL','BL','BL','BL','BL',0,0],
+  // Gi pants (blue)
+  [0,'BL','BL','OR','BL','BL','BL','OR','BL','BL',0,0],
+  [0,'BL','BL','OR','BL','BL','BL','OR','BL','BL',0,0],
+  [0,'BL','BL','OR','BL','BL','BL','OR','BL','BL',0,0],
+  // Legs
+  [0,0,'OR','OR','BL',0,0,'BL','OR','OR',0,0],
+  [0,0,'OR','OR','BL',0,0,'BL','OR','OR',0,0],
+  // Boots (red)
+  [0,0,'RD','RD','RD',0,0,'RD','RD','RD',0,0],
+  [0,0,'RD','RD','RD',0,0,'RD','RD','RD',0,0],
+],
+
+goku_ssj:[
+  // Hair (golden/yellow)
+  [0,0,'YL','YL','YL','YL','YL','YL','YL',0,0,0],
+  [0,'YL','YL','YL','YL','YL','YL','YL','YL','YL',0,0],
+  ['YL','YL','YL','SK','SK','SK','SK','SK','YL','YL','YL',0],
+  [0,'YL','SK','SK','SK','SK','SK','SK','SK','YL',0,0],
+  [0,'SK','SK','W','BK','SK','W','BK','SK','SK',0,0],
+  [0,'SK','SK','SK','SK','SK','SK','SK','SK','SK',0,0],
+  [0,'SK','SK','SK','OR','SK','SK','OR','SK','SK',0,0],
+  [0,0,'SK','SK','SK','SK','SK','SK','SK',0,0,0],
+  [0,0,0,'SK','SK','SK','SK','SK',0,0,0,0],
+  [0,'OR','OR','OR','OR','OR','OR','OR','OR','OR',0,0],
+  [0,'OR','BL','OR','OR','OR','OR','OR','BL','OR',0,0],
+  ['OR','OR','OR','OR','OR','OR','OR','OR','OR','OR','OR',0],
+  [0,'BL','BL','BL','BL','BL','BL','BL','BL','BL',0,0],
+  [0,'BL','BL','OR','BL','BL','BL','OR','BL','BL',0,0],
+  [0,'BL','BL','OR','BL','BL','BL','OR','BL','BL',0,0],
+  [0,'BL','BL','OR','BL','BL','BL','OR','BL','BL',0,0],
+  [0,0,'OR','OR','BL',0,0,'BL','OR','OR',0,0],
+  [0,0,'OR','OR','BL',0,0,'BL','OR','OR',0,0],
+  [0,0,'RD','RD','RD',0,0,'RD','RD','RD',0,0],
+  [0,0,'RD','RD','RD',0,0,'RD','RD','RD',0,0],
+],
+
+vegeta:[
+  // Widow peak hair
+  [0,'BK','BK','BK','BK','BK','BK','BK','BK','BK',0,0],
+  ['BK','BK','BK','BK','BK','BK','BK','BK','BK','BK','BK',0],
+  ['BK','BK','BK','SK','SK','SK','SK','SK','BK','BK','BK',0],
+  [0,'BK','SK','SK','SK','SK','SK','SK','SK','BK',0,0],
+  [0,'SK','SK','W','BK','SK','W','BK','SK','SK',0,0],
+  [0,'SK','SK','SK','SK','SK','SK','SK','SK','SK',0,0],
+  [0,'SK','SK','SK',0,'SK','SK',0,'SK','SK',0,0], // stern face
+  [0,0,'SK','SK','SK','SK','SK','SK','SK',0,0,0],
+  [0,0,0,'SK','SK','SK','SK','SK',0,0,0,0],
+  // Saiyan armor (white/gold)
+  [0,'WH','WH','WH','WH','WH','WH','WH','WH','WH',0,0],
+  [0,'WH','YL','WH','WH','WH','WH','WH','YL','WH',0,0],
+  ['WH','WH','WH','WH','WH','WH','WH','WH','WH','WH','WH',0],
+  // Belt
+  [0,'BK','BK','BK','BK','BK','BK','BK','BK','BK',0,0],
+  // Pants (blue/navy)
+  [0,'NV','NV','WH','NV','NV','NV','WH','NV','NV',0,0],
+  [0,'NV','NV','WH','NV','NV','NV','WH','NV','NV',0,0],
+  [0,'NV','NV','WH','NV','NV','NV','WH','NV','NV',0,0],
+  [0,0,'NV','NV','NV',0,0,'NV','NV','NV',0,0],
+  [0,0,'NV','NV','NV',0,0,'NV','NV','NV',0,0],
+  [0,0,'WH','WH','WH',0,0,'WH','WH','WH',0,0],
+  [0,0,'WH','WH','WH',0,0,'WH','WH','WH',0,0],
+],
+
+piccolo:[
+  // Antennae + head
+  [0,0,0,'LG','LG',0,0,'LG','LG',0,0,0],
+  [0,0,0,'LG','LG',0,0,'LG','LG',0,0,0],
+  [0,0,'LG','LG','LG','LG','LG','LG','LG','LG',0,0],
+  [0,'LG','LG','LG','LG','LG','LG','LG','LG','LG','LG',0],
+  [0,'LG','LG','W','BK','LG','W','BK','LG','LG',0,0],// eyes (white pupils)
+  [0,'LG','LG','LG','LG','LG','LG','LG','LG','LG',0,0],
+  [0,'LG','LG','LG','LG','LG','LG','LG','LG','LG',0,0],
+  [0,0,'LG','LG','LG','LG','LG','LG','LG',0,0,0],
+  [0,0,0,'LG','LG','LG','LG','LG',0,0,0,0],
+  // Purple gi / cape
+  [0,'PU','PU','PU','PU','PU','PU','PU','PU','PU',0,0],
+  [0,'PU','WH','PU','PU','PU','PU','PU','WH','PU',0,0],
+  ['PU','PU','PU','PU','PU','PU','PU','PU','PU','PU','PU',0],
+  [0,'WH','WH','WH','WH','WH','WH','WH','WH','WH',0,0],
+  // Pants (purple)
+  [0,'PU','PU','WH','PU','PU','PU','WH','PU','PU',0,0],
+  [0,'PU','PU','WH','PU','PU','PU','WH','PU','PU',0,0],
+  [0,'PU','PU','WH','PU','PU','PU','WH','PU','PU',0,0],
+  [0,0,'PU','PU','PU',0,0,'PU','PU','PU',0,0],
+  [0,0,'PU','PU','PU',0,0,'PU','PU','PU',0,0],
+  [0,0,'WH','WH','WH',0,0,'WH','WH','WH',0,0],
+  [0,0,'WH','WH','WH',0,0,'WH','WH','WH',0,0],
+],
+
+frieza:[
+  // Head (white/purple markings)
+  [0,0,'WH','WH','WH','WH','WH','WH','WH',0,0,0],
+  [0,'WH','WH','WH','WH','WH','WH','WH','WH','WH',0,0],
+  [0,'WH','PU','WH','WH','WH','WH','WH','PU','WH',0,0], // head markings
+  [0,'WH','WH','WH','WH','WH','WH','WH','WH','WH',0,0],
+  [0,'WH','WH','RD','BK','WH','RD','BK','WH','WH',0,0], // creepy eyes
+  [0,'WH','WH','WH','WH','WH','WH','WH','WH','WH',0,0],
+  [0,'WH','PU','WH','WH','WH','WH','WH','PU','WH',0,0],
+  [0,0,'WH','WH','WH','WH','WH','WH','WH',0,0,0],
+  [0,0,0,'WH','WH','WH','WH','WH',0,0,0,0],
+  // Armor (white/purple)
+  [0,'WH','WH','WH','WH','WH','WH','WH','WH','WH',0,0],
+  [0,'WH','PU','WH','WH','WH','WH','WH','PU','WH',0,0],
+  ['WH','WH','WH','WH','WH','WH','WH','WH','WH','WH','WH',0],
+  [0,'PU','PU','PU','PU','PU','PU','PU','PU','PU',0,0],
+  // Tail + legs (long)
+  [0,'WH','WH','PU','WH','WH','WH','PU','WH','WH',0,0],
+  [0,'WH','WH','PU','WH','WH','WH','PU','WH','WH',0,0],
+  [0,'WH','WH','PU','WH','WH','WH','PU','WH','WH',0,0],
+  [0,0,'WH','WH','WH',0,0,'WH','WH','WH',0,0],
+  [0,0,'WH','WH','WH',0,0,'WH','WH','WH',0,0],
+  [0,0,'PU','PU','PU',0,0,'PU','PU','PU',0,0],
+  [0,0,'PU','PU','PU',0,0,'PU','PU','PU',0,0],
+],
+
+gohan:[
+  // Hair (black, similar to goku but shorter)
+  [0,0,'BK','BK','BK','BK','BK','BK',0,0,0,0],
+  [0,'BK','BK','BK','BK','BK','BK','BK','BK','BK',0,0],
+  ['BK','BK','BK','SK','SK','SK','SK','SK','BK','BK',0,0],
+  [0,'BK','SK','SK','SK','SK','SK','SK','SK','BK',0,0],
+  [0,'SK','SK','W','BK','SK','W','BK','SK','SK',0,0],
+  [0,'SK','SK','SK','SK','SK','SK','SK','SK','SK',0,0],
+  [0,'SK','SK','SK',0,'SK','SK',0,'SK','SK',0,0],
+  [0,0,'SK','SK','SK','SK','SK','SK','SK',0,0,0],
+  [0,0,0,'SK','SK','SK','SK','SK',0,0,0,0],
+  // Purple gi
+  [0,'PU','PU','PU','PU','PU','PU','PU','PU','PU',0,0],
+  [0,'PU','YL','PU','PU','PU','PU','PU','YL','PU',0,0],
+  ['PU','PU','PU','PU','PU','PU','PU','PU','PU','PU','PU',0],
+  [0,'YL','YL','YL','YL','YL','YL','YL','YL','YL',0,0],
+  [0,'BL','BL','YL','BL','BL','BL','YL','BL','BL',0,0],
+  [0,'BL','BL','YL','BL','BL','BL','YL','BL','BL',0,0],
+  [0,'BL','BL','YL','BL','BL','BL','YL','BL','BL',0,0],
+  [0,0,'BL','BL','BL',0,0,'BL','BL','BL',0,0],
+  [0,0,'BL','BL','BL',0,0,'BL','BL','BL',0,0],
+  [0,0,'BK','BK','BK',0,0,'BK','BK','BK',0,0],
+  [0,0,'BK','BK','BK',0,0,'BK','BK','BK',0,0],
+],
+};
+
+// ── BUILD CHARACTER SVG ────────────────────────────────────────────
+function buildPixelChar(spriteKey, scale=4) {
+  const grid = SPRITES[spriteKey];
+  const cols = 12, rows = 20;
+  const W = cols * scale, H = rows * scale;
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" shape-rendering="crispEdges">`;
+  for (let r=0; r<rows; r++) {
+    for (let c=0; c<cols; c++) {
+      const v = grid[r][c];
+      if (!v || v === 0) continue;
+      const col = PAL[v] || v;
+      svg += `<rect x="${c*scale}" y="${r*scale}" width="${scale}" height="${scale}" fill="${col}"/>`;
+    }
+  }
+  svg += '</svg>';
+  return 'data:image/svg+xml;base64,' + btoa(svg);
+}
+
+// ── CHARACTER DEFINITIONS ──────────────────────────────────────────
+const CHARS = [
+  {
+    id:'goku', name:'Goku', sprite:'goku', ssjSprite:'goku_ssj',
+    aura:'#ffd700', glow:'#ff6a00', speed:1.4, jumpH:200,
+    x:80,  vx:1.4,  flipped:false, state:'walk', timer:100,
+    isSSJ:false, y:0, vy:0, jumping:false,
+    quotes:['KAMEHAMEHA!!','I need to get stronger!','KAIO-KEN x10!'],
+    fightQ:['KAMEHAMEHA!!','KAIO-KEN!!','This ends NOW!'],
+    powerQ:["I'M GOING SUPER SAIYAN!",'AAAAHHHH!!!','FULL POWER!!'],
+  },
+  {
+    id:'vegeta', name:'Vegeta', sprite:'vegeta', ssjSprite:null,
+    aura:'#8800ff', glow:'#aa00ff', speed:1.6, jumpH:180,
+    x:500, vx:-1.6, flipped:true,  state:'walk', timer:120,
+    isSSJ:false, y:0, vy:0, jumping:false,
+    quotes:['PRINCE OF SAIYANS!','OVER 9000!!','FINAL FLASH!!'],
+    fightQ:['FINAL FLASH!!','GALICK GUN!!','Prepare to die!'],
+    powerQ:['MY PRIDE...!','VEGETA WINS!!','FINAL BURST!!'],
+  },
+  {
+    id:'piccolo', name:'Piccolo', sprite:'piccolo', ssjSprite:null,
+    aura:'#00aa44', glow:'#004422', speed:1.2, jumpH:220,
+    x:900, vx:1.2,  flipped:false, state:'idle', timer:200,
+    isSSJ:false, y:0, vy:0, jumping:false,
+    quotes:['Special Beam Cannon!','Train harder.','MAKANKOSAPPO!!'],
+    fightQ:['HELLZONE GRENADE!!','Special Beam Cannon!!','FEEL MY POWER!'],
+    powerQ:['Unlimited power...','RISING KI!!','BREAK YOUR LIMITS!'],
+  },
+  {
+    id:'frieza', name:'Frieza', sprite:'frieza', ssjSprite:null,
+    aura:'#cc44ff', glow:'#880088', speed:1.3, jumpH:240,
+    x:1100,vx:-1.3, flipped:true,  state:'float', timer:180,
+    isSSJ:false, y:0, vy:0, jumping:false,
+    quotes:['Greatest in the universe!','DEATH BEAM!!','Pathetic fools...'],
+    fightQ:['DEATH BALL!!','SUPERNOVA!!','YOU ALL DIE!!'],
+    powerQ:['100% POWER!!','UNLIMITED MIGHT!!','TREMBLE!!'],
+  },
+  {
+    id:'gohan', name:'Gohan', sprite:'gohan', ssjSprite:null,
+    aura:'#ffd700', glow:'#ff6600', speed:1.5, jumpH:195,
+    x:300, vx:-1.5, flipped:true,  state:'walk', timer:110,
+    isSSJ:false, y:0, vy:0, jumping:false,
+    quotes:["It's over!","MASENKO!!",'THIS POWER...!'],
+    fightQ:['MASENKO HA!!','KAMEHAMEHA!!','I WONT LOSE!!'],
+    powerQ:['RAAAHHHHH!!!','SSJ2!!!','HIDDEN POWER!!!'],
+  },
+];
+
+const GRAV = 0.7;
+let els = {}, frame = 0;
+let imgCache = {};
+
+// Pre-render all sprites
+function prerender() {
+  Object.keys(SPRITES).forEach(k => { imgCache[k] = buildPixelChar(k, 5); });
+}
+
+// ── RENDER SINGLE CHARACTER ────────────────────────────────────────
+function buildCharEl(char) {
+  const wrap = document.createElement('div');
+  wrap.id = 'char-' + char.id;
+  wrap.className = 'char-wrap';
+  wrap.style.cssText = `left:${char.x}px; bottom:0; z-index:5;`;
+
+  // Aura
+  const aura = document.createElement('div');
+  aura.className = 'char-aura';
+  aura.style.cssText = `width:70px;height:20px;transform:translateX(-50%);background:${char.aura};`;
+  wrap.appendChild(aura);
+
+  // Left leg
+  const legL = document.createElement('div');
+  legL.className = 'leg-l';
+  legL.style.cssText = `position:absolute;bottom:10px;left:10px;width:10px;height:22px;background:transparent;transform-origin:top center;`;
+
+  // Right leg
+  const legR = document.createElement('div');
+  legR.className = 'leg-r';
+  legR.style.cssText = `position:absolute;bottom:10px;left:26px;width:10px;height:22px;background:transparent;transform-origin:top center;`;
+
+  // Body img
+  const img = document.createElement('img');
+  img.src = imgCache[char.sprite] || imgCache['goku'];
+  img.style.cssText = `display:block;width:60px;height:auto;image-rendering:pixelated;position:relative;z-index:2;filter:drop-shadow(0 0 6px ${char.aura});`;
+  img.draggable = false;
+  wrap.appendChild(img);
+
+  // Ki orb (for powerup state)
+  const kiOrb = document.createElement('div');
+  kiOrb.className = 'ki-orb';
+  kiOrb.style.cssText = `width:14px;height:14px;top:-18px;left:50%;transform:translateX(-50%);color:${char.aura};display:none;`;
+  wrap.appendChild(kiOrb);
+
+  // Speech bubble
+  const bubble = document.createElement('div');
+  bubble.className = 'speech-bubble';
+  bubble.id = 'bubble-' + char.id;
+  const tail = document.createElement('span');
+  bubble.appendChild(tail);
+  wrap.appendChild(bubble);
+
+  // Name tag
+  const name = document.createElement('div');
+  name.className = 'char-name';
+  name.textContent = char.name.toUpperCase();
+  name.style.color = char.aura;
+  name.style.textShadow = `0 0 8px ${char.aura}`;
+  wrap.appendChild(name);
+
+  wrap.addEventListener('click', e => {
+    e.stopPropagation();
+    doJump(char);
+    speak(char, char.quotes[Math.floor(Math.random()*char.quotes.length)]);
+    boom(char.x + 30, window.innerHeight - 80, char.aura);
+  });
+
+  return { wrap, img, aura, kiOrb, bubble };
+}
+
+function init() {
+  prerender();
+  const layer = document.getElementById('characters-layer');
+  if (!layer) return;
+  CHARS.forEach(char => {
+    const el = buildCharEl(char);
+    layer.appendChild(el.wrap);
+    els[char.id] = el;
+  });
+  requestAnimationFrame(loop);
+  setInterval(() => speak(CHARS[Math.floor(Math.random()*CHARS.length)]), 4000);
+  setInterval(doInteraction, 7500);
+  setInterval(doPowerUp, 12000);
+}
+
+function loop() {
+  frame++;
+  const W = window.innerWidth;
+
+  CHARS.forEach(char => {
+    const el = els[char.id];
+    if (!el) return;
+
+    // State tick
+    char.timer--;
+    if (char.timer <= 0) nextState(char);
+
+    // Physics
+    if (char.jumping) {
+      char.vy += GRAV;
+      char.y -= char.vy;
+      if (char.y <= 0) { char.y=0; char.jumping=false; char.vy=0; }
+    }
+
+    // Movement
+    if (char.state==='walk')  char.x += char.vx;
+    if (char.state==='run')   char.x += char.vx * 3;
+    if (char.state==='fight') char.x += char.vx * 1.2;
+    if (char.state==='float') {
+      char.x += char.vx * 0.6;
+      char.y = 25 + Math.sin(frame * 0.02) * 18;
+    }
+
+    // Boundary
+    if (char.x > W - 70) { char.x = W-70; char.vx = -Math.abs(char.vx); char.flipped = true; }
+    if (char.x < 5)       { char.x = 5;    char.vx =  Math.abs(char.vx); char.flipped = false; }
+
+    // Apply position
+    el.wrap.style.left = char.x + 'px';
+    el.wrap.style.bottom = Math.max(0, char.y) + 'px';
+    el.wrap.style.transform = char.flipped ? 'scaleX(-1)' : 'scaleX(1)';
+
+    // Leg animations based on state
+    const speed = char.state==='run' ? '0.2s' : char.state==='walk' ? '0.4s' : '0.8s';
+    const legAnim = (char.state==='walk'||char.state==='run') ? `legLeft ${speed} ease-in-out infinite alternate` : 'none';
+
+    // Image glow/filter per state
+    if (char.state==='powerup') {
+      el.img.style.filter = `drop-shadow(0 0 20px ${char.aura}) drop-shadow(0 0 40px ${char.glow}) brightness(1.5)`;
+      el.aura.style.width = '90px'; el.aura.style.height = '30px'; el.aura.style.opacity='0.9';
+      el.kiOrb.style.display = 'block';
+    } else if (char.state==='fight') {
+      el.img.style.filter = `drop-shadow(0 0 12px ${char.aura}) drop-shadow(0 2px 4px #000) brightness(1.2)`;
+      el.aura.style.width = '75px'; el.aura.style.height = '22px'; el.aura.style.opacity='0.7';
+      el.kiOrb.style.display = 'none';
+    } else {
+      el.img.style.filter = `drop-shadow(0 0 6px ${char.aura}) drop-shadow(0 2px 6px #000)`;
+      el.aura.style.width = '65px'; el.aura.style.height = '16px'; el.aura.style.opacity='0.5';
+      el.kiOrb.style.display = 'none';
+    }
+
+    // Walk bob animation on the whole wrap
+    if (char.state==='walk') {
+      el.wrap.style.animation = 'walkBob 0.4s ease-in-out infinite';
+    } else if (char.state==='run') {
+      el.wrap.style.animation = 'runBob 0.2s ease-in-out infinite';
+    } else if (char.state==='idle') {
+      el.wrap.style.animation = 'idleBreath 2s ease-in-out infinite';
+    } else if (char.state==='powerup') {
+      el.wrap.style.animation = 'powerUp 1.5s ease-in-out infinite';
+    } else if (char.state==='float') {
+      el.wrap.style.animation = 'floatUp 2s ease-in-out infinite';
+    } else {
+      el.wrap.style.animation = 'none';
+    }
+  });
+
+  requestAnimationFrame(loop);
+}
+
+function nextState(char) {
+  const r = Math.random();
+  if      (r < 0.28) { char.state='walk';  char.timer=100+Math.random()*150; }
+  else if (r < 0.40) { char.state='run';   char.timer=30+Math.random()*50; char.vx=(Math.random()>.5?1:-1)*char.speed; char.flipped=char.vx<0; }
+  else if (r < 0.55) { char.state='idle';  char.timer=80+Math.random()*120; }
+  else if (r < 0.65) { char.state='jump';  char.timer=60; doJump(char); char.state='walk'; }
+  else if (r < 0.78) { char.state='fight'; char.timer=50+Math.random()*60; }
+  else if (char.id==='frieza') { char.state='float'; char.timer=120+Math.random()*120; }
+  else { char.state='walk'; char.timer=100; }
+}
+
+function doJump(char) {
+  if (!char.jumping) { char.jumping=true; char.vy = -(char.jumpH * 0.18); }
+}
+
+function speak(char, text) {
+  text = text || char.quotes[Math.floor(Math.random()*char.quotes.length)];
+  const el = els[char.id];
+  if (!el) return;
+  // Clear old text node
+  while (el.bubble.firstChild && el.bubble.firstChild.nodeType===3) el.bubble.removeChild(el.bubble.firstChild);
+  const old = el.bubble.querySelector('.btxt');
+  if (old) old.remove();
+  const sp = document.createElement('span');
+  sp.className = 'btxt';
+  sp.textContent = text;
+  el.bubble.insertBefore(sp, el.bubble.firstChild);
+  el.bubble.style.opacity = '1';
+  setTimeout(() => { el.bubble.style.opacity='0'; }, 2200);
+}
+
+function doInteraction() {
+  if (CHARS.length < 2) return;
+  let a = Math.floor(Math.random()*CHARS.length);
+  let b = Math.floor(Math.random()*CHARS.length);
+  while (b===a) b = Math.floor(Math.random()*CHARS.length);
+  const from=CHARS[a], to=CHARS[b];
+  speak(from, from.fightQ[Math.floor(Math.random()*from.fightQ.length)]);
+  from.state='fight'; from.timer=70;
+  fireKiBlast(from, to);
+}
+
+function fireKiBlast(from, to) {
+  const el = document.createElement('div');
+  const sx = from.x+30, sy = window.innerHeight-100;
+  const ex = to.x+30,   ey = window.innerHeight-100;
+  el.style.cssText = `position:fixed;left:${sx}px;top:${sy}px;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle,#fff,${from.aura},transparent);box-shadow:0 0 16px ${from.aura};pointer-events:none;z-index:8;transform:translate(-50%,-50%);`;
+  document.body.appendChild(el);
+  const dx=ex-sx, dy=ey-sy, dist=Math.sqrt(dx*dx+dy*dy), dur=Math.max(220,dist*.65);
+  let t0=null;
+  (function step(ts){
+    if(!t0)t0=ts;
+    const p=Math.min(1,(ts-t0)/dur);
+    el.style.left=(sx+dx*p)+'px';
+    el.style.top=(sy+dy*p-100*Math.sin(Math.PI*p))+'px';
+    el.style.opacity=String(1-p*.3);
+    if(p<1){ requestAnimationFrame(step); }
+    else { boom(ex,ey,from.aura); el.remove(); speak(to, to.quotes[Math.floor(Math.random()*to.quotes.length)]); }
+  })(0);
+  requestAnimationFrame(step => { t0=null; (function f(ts){ if(!t0)t0=ts; const p=Math.min(1,(ts-t0)/dur); el.style.left=(sx+dx*p)+'px'; el.style.top=(sy+dy*p-100*Math.sin(Math.PI*p))+'px'; el.style.opacity=String(1-p*.3); if(p<1) requestAnimationFrame(f); else { boom(ex,ey,from.aura); el.remove(); speak(to, to.quotes[Math.floor(Math.random()*to.quotes.length)]); } })(ts); });
+}
+
+function boom(x, y, color) {
+  for (let i=0; i<6; i++) {
+    const e=document.createElement('div');
+    const s=20+Math.random()*30;
+    e.style.cssText = `position:fixed;left:${x+(Math.random()-.5)*50}px;top:${y+(Math.random()-.5)*40}px;width:${s}px;height:${s}px;border-radius:50%;background:radial-gradient(circle,#fff,${color},transparent);pointer-events:none;z-index:9;animation:explosion .55s ease-out forwards;animation-delay:${i*.04}s;`;
+    document.body.appendChild(e);
+    setTimeout(()=>e.remove(), 650);
+  }
+}
+
+function doPowerUp() {
+  const char = CHARS[Math.floor(Math.random()*CHARS.length)];
+  const el = els[char.id];
+  if (!el) return;
+  char.state='powerup'; char.timer=100;
+  speak(char, char.powerQ[Math.floor(Math.random()*char.powerQ.length)]);
+  boom(char.x+30, window.innerHeight-80, char.aura);
+  // Goku SSJ
+  if (char.id==='goku' && !char.isSSJ && Math.random()>.4) {
+    char.isSSJ=true;
+    el.img.src = imgCache['goku_ssj'];
+    el.aura.style.background='#ffd700';
+    setTimeout(() => { char.isSSJ=false; el.img.src=imgCache['goku']; el.aura.style.background=char.aura; }, 15000);
+  }
+}
+
+document.addEventListener('click', e => {
+  if (e.target.closest && e.target.closest('#characters-layer')) return;
+  const p=document.createElement('div');
+  p.className='ki-particle';
+  const s=10+Math.random()*12;
+  p.style.cssText=`left:${e.clientX-s/2}px;top:${e.clientY-s/2}px;width:${s}px;height:${s}px;`;
+  document.body.appendChild(p);
+  setTimeout(()=>p.remove(),600);
+});
+
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init);
+else setTimeout(init,80);
+window.dbzBoom=boom;
+})();
+"""
+
+# ─────────────────────────────────────────────────────────────────────
+# DBZ INTRO — fully self-contained, no external assets
+# ─────────────────────────────────────────────────────────────────────
+DBZ_INTRO = r"""
+<div id="dbz-intro" style="position:fixed;inset:0;z-index:99999;background:#000;font-family:'Bangers',cursive;overflow:hidden;">
+
+  <button id="intro-skip"
+    style="position:absolute;top:18px;right:18px;z-index:10;background:transparent;
+           border:1px solid rgba(255,106,0,.5);color:rgba(255,106,0,.8);
+           font-family:'Bangers',cursive;font-size:.9rem;letter-spacing:.15em;
+           padding:6px 16px;cursor:pointer;border-radius:2px;"
+    onclick="window.__dbzSkip && window.__dbzSkip()">
     SKIP ▶
   </button>
 
-  <!-- ── PHASE 1: BLACK SCREEN FLASH ── -->
-  <div id="intro-flash" style="
-    position:absolute;inset:0;background:#fff;
-    opacity:0;pointer-events:none;
-    transition:opacity .08s;
-  "></div>
+  <!-- FLASH OVERLAY -->
+  <div id="iFlash" style="position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:5;"></div>
 
-  <!-- ── PHASE 2: ENERGY CHARGE SCREEN ── -->
-  <div id="intro-charge" style="
-    position:absolute;inset:0;opacity:0;
-    display:flex;align-items:center;justify-content:center;
-    background:radial-gradient(ellipse at center,#1a0800 0%,#000 70%);
-  ">
-    <!-- Ground shockwave rings -->
-    <div id="shock1" style="
-      position:absolute;bottom:0;left:50%;transform:translateX(-50%);
-      width:0;height:0;border-radius:50%;
-      border:3px solid #ff6a00;opacity:0;
-    "></div>
-    <div id="shock2" style="
-      position:absolute;bottom:0;left:50%;transform:translateX(-50%);
-      width:0;height:0;border-radius:50%;
-      border:2px solid #ffd700;opacity:0;
-    "></div>
-    <div id="shock3" style="
-      position:absolute;bottom:0;left:50%;transform:translateX(-50%);
-      width:0;height:0;border-radius:50%;
-      border:2px solid #fff;opacity:0;
-    "></div>
+  <!-- PHASE 1: POWER CHARGE -->
+  <div id="iCharge" style="position:absolute;inset:0;opacity:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,#1a0800,#000 70%);">
+    <canvas id="iLCanvas" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;"></canvas>
 
-    <!-- Aura column -->
-    <div id="aura-column" style="
-      position:absolute;bottom:0;left:50%;transform:translateX(-50%);
-      width:80px;height:0;
-      background:linear-gradient(0deg,#ffd700,#ff6a00,transparent);
-      filter:blur(12px);opacity:0;
-      border-radius:50% 50% 0 0;
-    "></div>
-
-    <!-- Lightning bolts -->
-    <canvas id="lightning-canvas" style="
-      position:absolute;inset:0;width:100%;height:100%;
-      pointer-events:none;opacity:0;
-    "></canvas>
-
-    <!-- Power Level Counter -->
-    <div id="power-counter-intro" style="
-      position:absolute;top:30px;right:30px;
-      background:rgba(0,0,0,.8);border:2px solid #ff6a00;
-      padding:8px 16px;border-radius:4px;
-      box-shadow:0 0 20px rgba(255,106,0,.5);
-    ">
-      <div style="font-size:.6rem;color:#c8a878;letter-spacing:.3em;margin-bottom:2px">POWER LEVEL</div>
-      <div id="pl-number" style="font-size:1.8rem;color:#ffd700;letter-spacing:.05em">000000</div>
+    <div style="position:absolute;top:24px;right:24px;background:rgba(0,0,0,.85);border:2px solid #ff6a00;padding:8px 16px;border-radius:3px;box-shadow:0 0 20px rgba(255,106,0,.4);">
+      <div style="font-size:.55rem;color:#c8a878;letter-spacing:.3em;margin-bottom:2px;">POWER LEVEL</div>
+      <div id="iPL" style="font-size:2rem;color:#ffd700;letter-spacing:.05em;">000000</div>
     </div>
 
-    <!-- Scouter beep text -->
-    <div id="scouter-text" style="
-      position:absolute;top:30px;left:30px;
-      color:#00ff44;font-size:.75rem;
-      letter-spacing:.2em;opacity:0;
-      font-family:'Share Tech Mono',monospace;
-    ">SCANNING...</div>
+    <div style="position:absolute;top:24px;left:24px;font-family:'Share Tech Mono',monospace;font-size:.7rem;color:#00ff44;opacity:0;" id="iScout">SCOUTING...</div>
 
-    <!-- Central character silhouette -->
-    <div id="char-silhouette" style="
-      position:absolute;bottom:60px;left:50%;transform:translateX(-50%);
-      width:120px;height:220px;
-      background:linear-gradient(180deg,#ffd700,#ff6a00);
-      clip-path:polygon(30% 0%,70% 0%,85% 15%,90% 30%,85% 50%,80% 65%,90% 80%,85% 100%,15% 100%,10% 80%,20% 65%,15% 50%,10% 30%,15% 15%);
-      opacity:0;filter:blur(2px);
-      box-shadow:0 0 40px #ffd700,0 0 80px #ff6a00;
-    "></div>
+    <div id="iAura" style="position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:60px;height:0;background:linear-gradient(0deg,#ffd700,#ff6a00,transparent);filter:blur(10px);opacity:0;border-radius:50% 50% 0 0;"></div>
 
-    <!-- Aura spikes around silhouette -->
-    <div id="aura-spikes" style="
-      position:absolute;bottom:55px;left:50%;transform:translateX(-50%);
-      width:300px;height:300px;opacity:0;
-    ">
-      <svg viewBox="0 0 300 300" style="width:100%;height:100%">
-        <polygon points="150,10 130,80 150,60 170,80" fill="#ffd700" opacity="0.8"/>
-        <polygon points="260,60 200,110 220,100 195,140" fill="#ff6a00" opacity="0.7"/>
-        <polygon points="290,150 220,150 240,130 220,170" fill="#ffd700" opacity="0.6"/>
-        <polygon points="260,240 200,190 220,200 195,160" fill="#ff6a00" opacity="0.7"/>
-        <polygon points="40,60 100,110 80,100 105,140" fill="#ff6a00" opacity="0.7"/>
-        <polygon points="10,150 80,150 60,130 80,170" fill="#ffd700" opacity="0.6"/>
-        <polygon points="40,240 100,190 80,200 105,160" fill="#ff6a00" opacity="0.7"/>
-      </svg>
+    <div id="iShockWrap" style="position:absolute;bottom:30px;left:50%;transform:translateX(-50%);width:0;height:0;pointer-events:none;">
     </div>
 
-    <!-- AAAAAHHH scream text -->
-    <div id="scream-text" style="
-      position:absolute;top:50%;left:50%;
-      transform:translate(-50%,-50%);
-      font-size:clamp(3rem,10vw,7rem);
-      letter-spacing:.1em;
-      opacity:0;white-space:nowrap;
-      background:linear-gradient(135deg,#fff,#ffd700,#ff6a00);
-      -webkit-background-clip:text;-webkit-text-fill-color:transparent;
-      filter:drop-shadow(0 0 30px #ffd700);
-      text-align:center;
-    ">AAAAHHHHH!!!</div>
+    <!-- Pixel Goku silhouette (CSS only) -->
+    <div id="iSil" style="position:absolute;bottom:50px;left:50%;transform:translateX(-50%);opacity:0;">
+      <canvas id="iSilCanvas" width="96" height="160" style="image-rendering:pixelated;filter:brightness(0) saturate(0) invert(1) sepia(1) saturate(5) hue-rotate(5deg);"></canvas>
+    </div>
+
+    <div id="iScream" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.5);font-size:clamp(2.5rem,8vw,6rem);letter-spacing:.08em;opacity:0;background:linear-gradient(135deg,#fff,#ffd700,#ff6a00);-webkit-background-clip:text;-webkit-text-fill-color:transparent;white-space:nowrap;text-align:center;transition:transform .2s,opacity .15s;">
+      AAAAHHHHH!!!
+    </div>
   </div>
 
-  <!-- ── PHASE 3: TITLE CARD ── -->
-  <div id="intro-title" style="
-    position:absolute;inset:0;opacity:0;
-    display:flex;flex-direction:column;
-    align-items:center;justify-content:center;
-    background:radial-gradient(ellipse at center,#0d0400 0%,#000 80%);
-  ">
-    <!-- Speed lines -->
-    <canvas id="speed-canvas" style="
-      position:absolute;inset:0;width:100%;height:100%;
-      pointer-events:none;
-    "></canvas>
+  <!-- PHASE 2: TITLE -->
+  <div id="iTitle" style="position:absolute;inset:0;opacity:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,#0d0400,#000 80%);">
+    <canvas id="iSpeedCanvas" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:0.35;"></canvas>
 
-    <!-- Dragon silhouette -->
-    <div style="
-      position:absolute;top:0;left:0;right:0;bottom:0;
-      background:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 100%22><path d=%22M0 50 Q50 10 100 50 Q150 90 200 50%22 stroke=%22%23ff6a0022%22 stroke-width=%222%22 fill=%22none%22/></svg>') center/cover;
-      opacity:0.3;pointer-events:none;
-    "></div>
-
-    <!-- Dragon balls row -->
-    <div id="dballs-intro" style="
-      display:flex;gap:16px;margin-bottom:24px;opacity:0;
-    ">
-      <div class="dball-big" style="animation-delay:0s"></div>
-      <div class="dball-big" style="animation-delay:.1s"></div>
-      <div class="dball-big" style="animation-delay:.2s"></div>
-      <div class="dball-big" style="animation-delay:.3s"></div>
-      <div class="dball-big" style="animation-delay:.4s"></div>
-      <div class="dball-big" style="animation-delay:.5s"></div>
-      <div class="dball-big" style="animation-delay:.6s"></div>
+    <div id="iDBalls" style="display:flex;gap:14px;margin-bottom:20px;opacity:0;">
     </div>
 
-    <!-- Main title -->
-    <div id="main-title-intro" style="
-      font-size:clamp(3rem,12vw,8rem);
-      letter-spacing:.08em;line-height:.9;
-      text-align:center;
-      opacity:0;transform:scale(3);
-      background:linear-gradient(135deg,#fff 0%,#ffd700 30%,#ff6a00 60%,#ff1a1a 100%);
-      -webkit-background-clip:text;-webkit-text-fill-color:transparent;
-      filter:drop-shadow(0 0 30px #ff6a0088);
-    " id="title-text-intro">LOADING...</div>
+    <div id="iTitleText" style="font-size:clamp(2.5rem,10vw,7rem);letter-spacing:.08em;line-height:.95;text-align:center;opacity:0;transform:scale(3);background:linear-gradient(135deg,#fff 0%,#ffd700 35%,#ff6a00 65%,#ff1a1a 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 25px #ff6a0088);">
+      CTF
+    </div>
 
-    <!-- Subtitle -->
-    <div id="sub-title-intro" style="
-      font-size:clamp(.8rem,2vw,1.2rem);
-      letter-spacing:.4em;color:#ff6a00;
-      margin-top:16px;opacity:0;
-      text-transform:uppercase;
-    ">⚡ CAPTURE THE FLAG ⚡</div>
+    <div id="iSub" style="font-size:clamp(.75rem,2vw,1.1rem);letter-spacing:.4em;color:#ff6a00;margin-top:14px;opacity:0;">⚡ CAPTURE THE FLAG ⚡</div>
 
-    <!-- Power level bar -->
-    <div id="pl-bar-wrap" style="
-      margin-top:32px;width:min(400px,80vw);opacity:0;
-    ">
-      <div style="font-size:.65rem;color:#c8a878;letter-spacing:.3em;margin-bottom:6px;text-align:center">LOADING BATTLE DATA</div>
-      <div style="background:rgba(255,106,0,.15);border:1px solid rgba(255,106,0,.4);border-radius:2px;overflow:hidden;height:8px">
-        <div id="pl-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#ff6a00,#ffd700);transition:width .05s linear;box-shadow:0 0 10px #ffd700"></div>
+    <div id="iBarWrap" style="margin-top:28px;width:min(380px,80vw);opacity:0;">
+      <div style="font-size:.6rem;color:#c8a878;letter-spacing:.3em;margin-bottom:5px;text-align:center;">LOADING BATTLE DATA...</div>
+      <div style="background:rgba(255,106,0,.15);border:1px solid rgba(255,106,0,.4);border-radius:2px;height:7px;overflow:hidden;">
+        <div id="iBar" style="height:100%;width:0%;background:linear-gradient(90deg,#ff6a00,#ffd700);box-shadow:0 0 8px #ffd700;transition:width .04s linear;"></div>
       </div>
     </div>
 
-    <!-- ENTER button -->
-    <button id="enter-btn" onclick="skipIntro()" style="
-      display:none;margin-top:32px;
-      padding:14px 48px;
-      font-family:'Bangers',cursive;font-size:1.4rem;letter-spacing:.2em;
-      border:2px solid #ffd700;
-      background:linear-gradient(135deg,rgba(255,215,0,.2),rgba(255,106,0,.1));
-      color:#ffd700;cursor:pointer;border-radius:2px;
-      box-shadow:0 0 20px rgba(255,215,0,.3),0 0 40px rgba(255,106,0,.2);
-      animation:enterpulse 1.5s ease-in-out infinite;
-    ">⚡ ENTER THE BATTLE ⚡</button>
+    <button id="iEnterBtn" onclick="window.__dbzSkip && window.__dbzSkip()"
+      style="display:none;margin-top:28px;padding:12px 44px;font-family:'Bangers',cursive;font-size:1.3rem;letter-spacing:.18em;border:2px solid #ffd700;background:linear-gradient(135deg,rgba(255,215,0,.18),rgba(255,106,0,.08));color:#ffd700;cursor:pointer;border-radius:2px;animation:enterpulse 1.4s ease-in-out infinite;">
+      ⚡ ENTER THE BATTLE ⚡
+    </button>
   </div>
 
-  <!-- ── PHASE 4: CHARACTERS PARADE ── -->
-  <div id="intro-chars" style="
-    position:absolute;inset:0;opacity:0;
-    background:#000;overflow:hidden;
-  ">
-    <!-- Character spotlight -->
-    <div id="char-spotlight" style="
-      position:absolute;top:0;left:50%;transform:translateX(-50%);
-      width:300px;height:100%;
-      background:radial-gradient(ellipse at 50% 0%,rgba(255,215,0,.15) 0%,transparent 70%);
-      pointer-events:none;
-    "></div>
+  <!-- PHASE 3: CHARACTER PARADE -->
+  <div id="iParade" style="position:absolute;inset:0;opacity:0;background:#000;overflow:hidden;">
+    <canvas id="iParadeCanvas" style="position:absolute;inset:0;width:100%;height:100%;opacity:0.4;"></canvas>
 
-    <!-- Speed lines bg -->
-    <canvas id="parade-canvas" style="position:absolute;inset:0;width:100%;height:100%"></canvas>
-
-    <!-- Character display -->
-    <div id="parade-char" style="
-      position:absolute;bottom:0;left:50%;transform:translateX(-50%);
-      text-align:center;
-    ">
-      <img id="parade-img" src="" alt="" style="
-        height:min(65vh,380px);width:auto;
-        display:block;margin:0 auto;
-        filter:drop-shadow(0 0 30px #ffd700) drop-shadow(0 0 60px #ff6a00);
-        transform:scale(0);transition:transform .4s cubic-bezier(.34,1.56,.64,1);
-      "/>
-      <div id="parade-name" style="
-        font-size:clamp(2rem,6vw,4rem);letter-spacing:.15em;
-        color:#ffd700;margin-top:8px;
-        text-shadow:0 0 20px #ffd700,0 0 40px #ff6a00;
-        opacity:0;transform:translateY(20px);transition:all .4s ease;
-      "></div>
-      <div id="parade-quote" style="
-        font-size:clamp(.9rem,2vw,1.3rem);letter-spacing:.1em;
-        color:#ff6a00;margin-top:4px;
-        opacity:0;transform:translateY(10px);transition:all .3s ease .15s;
-      "></div>
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;">
+      <canvas id="iCharCanvas" width="120" height="200" style="image-rendering:pixelated;display:block;margin:0 auto;transform:scale(0);transition:transform .35s cubic-bezier(.34,1.56,.64,1);filter:drop-shadow(0 0 20px #ffd700);"></canvas>
+      <div id="iCharName" style="font-size:clamp(2rem,6vw,3.5rem);letter-spacing:.15em;color:#ffd700;margin-top:8px;opacity:0;transform:translateY(16px);transition:all .35s ease;"></div>
+      <div id="iCharQuote" style="font-size:clamp(.85rem,2vw,1.2rem);letter-spacing:.08em;color:#ff6a00;margin-top:4px;opacity:0;transform:translateY(8px);transition:all .3s ease .1s;"></div>
     </div>
 
-    <!-- Vs flash -->
-    <div id="vs-flash" style="
-      position:absolute;inset:0;
-      background:radial-gradient(ellipse at center,rgba(255,255,255,.95),rgba(255,215,0,.8),transparent 60%);
-      opacity:0;pointer-events:none;
-    "></div>
-
-    <!-- Aura ring at feet -->
-    <div id="parade-aura" style="
-      position:absolute;bottom:30px;left:50%;transform:translateX(-50%);
-      width:200px;height:40px;border-radius:50%;
-      background:transparent;
-      box-shadow:0 0 0 0 transparent;
-      pointer-events:none;
-    "></div>
+    <div id="iVsFlash" style="position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;"></div>
   </div>
 
 </div>
 
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Bangers&family=Rajdhani:wght@400;700&family=Share+Tech+Mono&display=swap');
-@keyframes enterpulse{0%,100%{box-shadow:0 0 20px rgba(255,215,0,.3),0 0 40px rgba(255,106,0,.2)}50%{box-shadow:0 0 40px rgba(255,215,0,.6),0 0 80px rgba(255,106,0,.4)}}
-@keyframes dball-drop{0%{transform:translateY(-40px) scale(0);opacity:0}60%{transform:translateY(5px) scale(1.1)}100%{transform:translateY(0) scale(1);opacity:1}}
-@keyframes dball-glow{0%,100%{box-shadow:0 0 10px rgba(255,215,0,.5)}50%{box-shadow:0 0 25px rgba(255,215,0,.9),0 0 50px rgba(255,106,0,.5)}}
-.dball-big{
-  width:32px;height:32px;border-radius:50%;
-  background:radial-gradient(circle at 35% 35%,#fff8e0,#ffd700 40%,#ff6a00 80%,#8b4500);
-  box-shadow:0 0 10px rgba(255,215,0,.5);
-  animation:dball-glow 2s ease-in-out infinite;
-}
+@keyframes enterpulse{0%,100%{box-shadow:0 0 16px rgba(255,215,0,.3),0 0 32px rgba(255,106,0,.15)}50%{box-shadow:0 0 32px rgba(255,215,0,.6),0 0 64px rgba(255,106,0,.35)}}
+@keyframes dballspin{0%{box-shadow:0 0 8px rgba(255,215,0,.4)}50%{box-shadow:0 0 20px rgba(255,215,0,.9),0 0 40px rgba(255,106,0,.4)}100%{box-shadow:0 0 8px rgba(255,215,0,.4)}}
 </style>
 
 <script>
 (function(){
-  // ── Only play intro once per session ──
-  if (sessionStorage.getItem('dbz_intro_done')) {
-    document.getElementById('dbz-intro').style.display = 'none';
-    return;
-  }
 
-  const CHAR_DATA = [
-    {
-      name: 'GOKU',
-      img: 'https://www.pngmart.com/files/22/Goku-SSJ-PNG-Isolated-Photo.png',
-      fallback: 'https://static.wikia.nocookie.net/dragonball/images/5/5b/Goku_SSJ_Namek_Saga.png',
-      quote: '"KAMEHAMEHA!!"',
-      aura: '#ffd700',
-    },
-    {
-      name: 'VEGETA',
-      img: 'https://www.pngmart.com/files/22/Vegeta-PNG-Isolated-Cutout.png',
-      fallback: 'https://static.wikia.nocookie.net/dragonball/images/8/8b/VegetavsGokuEp.png',
-      quote: '"OVER 9000!!"',
-      aura: '#8800ff',
-    },
-    {
-      name: 'PICCOLO',
-      img: 'https://www.pngmart.com/files/22/Piccolo-PNG-Free-Download.png',
-      fallback: 'https://static.wikia.nocookie.net/dragonball/images/3/33/PiccoloNV.png',
-      quote: '"SPECIAL BEAM CANNON!!"',
-      aura: '#00aa44',
-    },
-    {
-      name: 'GOHAN',
-      img: 'https://www.pngmart.com/files/22/Gohan-PNG-Free-Download.png',
-      fallback: 'https://static.wikia.nocookie.net/dragonball/images/5/5b/GohanSSJ2Cell.png',
-      quote: '"THIS POWER...!"',
-      aura: '#ffd700',
-    },
-    {
-      name: 'FRIEZA',
-      img: 'https://www.pngmart.com/files/22/Frieza-PNG-File.png',
-      fallback: 'https://static.wikia.nocookie.net/dragonball/images/6/6c/FriezaFinalForm.png',
-      quote: '"KNEEL BEFORE ME!!"',
-      aura: '#cc44ff',
-    },
-  ];
+// ── ONLY PLAY ONCE PER SESSION ──
+if(sessionStorage.getItem('dbz_done')){
+  document.getElementById('dbz-intro').style.display='none';
+  return;
+}
 
-  let introRunning = true;
+// ── Pixel palette + sprite (same as PIXEL_CHARS_JS) ──
+const PAL2={W:'#fff',SK:'#f5c97a',SK2:'#e8a85a',DK:'#1a0800',BK:'#111',OR:'#ff6a00',YL:'#ffd700',RD:'#ff2200',BL:'#1a44cc',PU:'#7700cc',GR:'#116611',GY:'#888',LG:'#22aa33',PK:'#ff44cc',WH:'#eeeeff',NV:'#001166',OG:'#ff8800',TL:'#00bbaa',SL:'#ccccdd',CY:'#00ddff'};
 
-  window.skipIntro = function() {
-    introRunning = false;
-    const intro = document.getElementById('dbz-intro');
-    intro.style.transition = 'opacity .5s';
-    intro.style.opacity = '0';
-    setTimeout(() => {
-      intro.style.display = 'none';
-      sessionStorage.setItem('dbz_intro_done', '1');
-    }, 500);
-  };
+const GOKU_GRID=[
+  [0,0,'BK','BK','BK','BK','BK','BK','BK',0,0,0],
+  [0,'BK','BK','BK','BK','BK','BK','BK','BK','BK',0,0],
+  ['BK','BK','BK','SK','SK','SK','SK','SK','BK','BK','BK',0],
+  [0,'BK','SK','SK','SK','SK','SK','SK','SK','BK',0,0],
+  [0,'SK','SK','W','BK','SK','W','BK','SK','SK',0,0],
+  [0,'SK','SK','SK','SK','SK','SK','SK','SK','SK',0,0],
+  [0,'SK','SK','SK','OR','SK','SK','OR','SK','SK',0,0],
+  [0,0,'SK','SK','SK','SK','SK','SK','SK',0,0,0],
+  [0,0,0,'SK','SK','SK','SK','SK',0,0,0,0],
+  [0,'OR','OR','OR','OR','OR','OR','OR','OR','OR',0,0],
+  [0,'OR','BL','OR','OR','OR','OR','OR','BL','OR',0,0],
+  ['OR','OR','OR','OR','OR','OR','OR','OR','OR','OR','OR',0],
+  [0,'BL','BL','BL','BL','BL','BL','BL','BL','BL',0,0],
+  [0,'BL','BL','OR','BL','BL','BL','OR','BL','BL',0,0],
+  [0,'BL','BL','OR','BL','BL','BL','OR','BL','BL',0,0],
+  [0,'BL','BL','OR','BL','BL','BL','OR','BL','BL',0,0],
+  [0,0,'OR','OR','BL',0,0,'BL','OR','OR',0,0],
+  [0,0,'OR','OR','BL',0,0,'BL','OR','OR',0,0],
+  [0,0,'RD','RD','RD',0,0,'RD','RD','RD',0,0],
+  [0,0,'RD','RD','RD',0,0,'RD','RD','RD',0,0],
+];
 
-  // ── LIGHTNING CANVAS ──
-  function drawLightning(canvas, color, intensity) {
-    const ctx = canvas.getContext('2d');
-    canvas.width = canvas.offsetWidth;
-    canvas.height = canvas.offsetHeight;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const cx = canvas.width / 2;
-    const cy = canvas.height * 0.6;
-    for (let i = 0; i < intensity; i++) {
-      ctx.beginPath();
-      ctx.strokeStyle = color;
-      ctx.lineWidth = Math.random() * 2 + 0.5;
-      ctx.globalAlpha = Math.random() * 0.8 + 0.2;
-      let x = cx + (Math.random() - 0.5) * 200;
-      let y = cy + (Math.random() - 0.5) * 200;
-      ctx.moveTo(x, y);
-      for (let j = 0; j < 6; j++) {
-        x += (Math.random() - 0.5) * 120;
-        y += (Math.random() - 0.5) * 120;
-        ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-    }
-    ctx.globalAlpha = 1;
-  }
+const CHARS_PARADE=[
+  {name:'GOKU',    grid:GOKU_GRID,             aura:'#ffd700',quote:'"KAMEHAMEHA!!"'},
+  {name:'VEGETA',  grid:null, aura:'#8800ff', quote:'"OVER 9000!!"'},
+  {name:'PICCOLO', grid:null, aura:'#00aa44', quote:'"SPECIAL BEAM CANNON!!"'},
+  {name:'GOHAN',   grid:null, aura:'#ffd700', quote:'"THIS POWER...!"'},
+  {name:'FRIEZA',  grid:null, aura:'#cc44ff', quote:'"KNEEL BEFORE ME!!"'},
+];
 
-  // ── SPEED LINES CANVAS ──
-  function drawSpeedLines(canvas, alpha) {
-    const ctx = canvas.getContext('2d');
-    canvas.width = canvas.offsetWidth || window.innerWidth;
-    canvas.height = canvas.offsetHeight || window.innerHeight;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const cx = canvas.width / 2, cy = canvas.height / 2;
-    ctx.globalAlpha = alpha;
-    for (let i = 0; i < 80; i++) {
-      const angle = (i / 80) * Math.PI * 2;
-      const inner = 60 + Math.random() * 40;
-      const outer = Math.max(canvas.width, canvas.height);
-      const width = Math.random() * 3 + 0.5;
-      ctx.beginPath();
-      ctx.strokeStyle = i % 3 === 0 ? '#ffd700' : i % 3 === 1 ? '#ff6a00' : '#fff';
-      ctx.lineWidth = width;
-      ctx.moveTo(cx + Math.cos(angle) * inner, cy + Math.sin(angle) * inner);
-      ctx.lineTo(cx + Math.cos(angle) * outer, cy + Math.sin(angle) * outer);
-      ctx.stroke();
-    }
-    ctx.globalAlpha = 1;
-  }
+// Vegeta grid
+const VG=[
+  [0,'BK','BK','BK','BK','BK','BK','BK','BK','BK',0,0],
+  ['BK','BK','BK','BK','BK','BK','BK','BK','BK','BK','BK',0],
+  ['BK','BK','BK','SK','SK','SK','SK','SK','BK','BK','BK',0],
+  [0,'BK','SK','SK','SK','SK','SK','SK','SK','BK',0,0],
+  [0,'SK','SK','W','BK','SK','W','BK','SK','SK',0,0],
+  [0,'SK','SK','SK','SK','SK','SK','SK','SK','SK',0,0],
+  [0,'SK','SK','SK',0,'SK','SK',0,'SK','SK',0,0],
+  [0,0,'SK','SK','SK','SK','SK','SK','SK',0,0,0],
+  [0,0,0,'SK','SK','SK','SK','SK',0,0,0,0],
+  [0,'WH','WH','WH','WH','WH','WH','WH','WH','WH',0,0],
+  [0,'WH','YL','WH','WH','WH','WH','WH','YL','WH',0,0],
+  ['WH','WH','WH','WH','WH','WH','WH','WH','WH','WH','WH',0],
+  [0,'BK','BK','BK','BK','BK','BK','BK','BK','BK',0,0],
+  [0,'NV','NV','WH','NV','NV','NV','WH','NV','NV',0,0],
+  [0,'NV','NV','WH','NV','NV','NV','WH','NV','NV',0,0],
+  [0,'NV','NV','WH','NV','NV','NV','WH','NV','NV',0,0],
+  [0,0,'NV','NV','NV',0,0,'NV','NV','NV',0,0],
+  [0,0,'NV','NV','NV',0,0,'NV','NV','NV',0,0],
+  [0,0,'WH','WH','WH',0,0,'WH','WH','WH',0,0],
+  [0,0,'WH','WH','WH',0,0,'WH','WH','WH',0,0],
+];
+const PIC=[
+  [0,0,0,'LG','LG',0,0,'LG','LG',0,0,0],
+  [0,0,0,'LG','LG',0,0,'LG','LG',0,0,0],
+  [0,0,'LG','LG','LG','LG','LG','LG','LG','LG',0,0],
+  [0,'LG','LG','LG','LG','LG','LG','LG','LG','LG','LG',0],
+  [0,'LG','LG','W','BK','LG','W','BK','LG','LG',0,0],
+  [0,'LG','LG','LG','LG','LG','LG','LG','LG','LG',0,0],
+  [0,'LG','LG','LG','LG','LG','LG','LG','LG','LG',0,0],
+  [0,0,'LG','LG','LG','LG','LG','LG','LG',0,0,0],
+  [0,0,0,'LG','LG','LG','LG','LG',0,0,0,0],
+  [0,'PU','PU','PU','PU','PU','PU','PU','PU','PU',0,0],
+  [0,'PU','WH','PU','PU','PU','PU','PU','WH','PU',0,0],
+  ['PU','PU','PU','PU','PU','PU','PU','PU','PU','PU','PU',0],
+  [0,'WH','WH','WH','WH','WH','WH','WH','WH','WH',0,0],
+  [0,'PU','PU','WH','PU','PU','PU','WH','PU','PU',0,0],
+  [0,'PU','PU','WH','PU','PU','PU','WH','PU','PU',0,0],
+  [0,'PU','PU','WH','PU','PU','PU','WH','PU','PU',0,0],
+  [0,0,'PU','PU','PU',0,0,'PU','PU','PU',0,0],
+  [0,0,'PU','PU','PU',0,0,'PU','PU','PU',0,0],
+  [0,0,'WH','WH','WH',0,0,'WH','WH','WH',0,0],
+  [0,0,'WH','WH','WH',0,0,'WH','WH','WH',0,0],
+];
+const GH=[
+  [0,0,'BK','BK','BK','BK','BK','BK',0,0,0,0],
+  [0,'BK','BK','BK','BK','BK','BK','BK','BK','BK',0,0],
+  ['BK','BK','BK','SK','SK','SK','SK','SK','BK','BK',0,0],
+  [0,'BK','SK','SK','SK','SK','SK','SK','SK','BK',0,0],
+  [0,'SK','SK','W','BK','SK','W','BK','SK','SK',0,0],
+  [0,'SK','SK','SK','SK','SK','SK','SK','SK','SK',0,0],
+  [0,'SK','SK','SK',0,'SK','SK',0,'SK','SK',0,0],
+  [0,0,'SK','SK','SK','SK','SK','SK','SK',0,0,0],
+  [0,0,0,'SK','SK','SK','SK','SK',0,0,0,0],
+  [0,'PU','PU','PU','PU','PU','PU','PU','PU','PU',0,0],
+  [0,'PU','YL','PU','PU','PU','PU','PU','YL','PU',0,0],
+  ['PU','PU','PU','PU','PU','PU','PU','PU','PU','PU','PU',0],
+  [0,'YL','YL','YL','YL','YL','YL','YL','YL','YL',0,0],
+  [0,'BL','BL','YL','BL','BL','BL','YL','BL','BL',0,0],
+  [0,'BL','BL','YL','BL','BL','BL','YL','BL','BL',0,0],
+  [0,'BL','BL','YL','BL','BL','BL','YL','BL','BL',0,0],
+  [0,0,'BL','BL','BL',0,0,'BL','BL','BL',0,0],
+  [0,0,'BL','BL','BL',0,0,'BL','BL','BL',0,0],
+  [0,0,'BK','BK','BK',0,0,'BK','BK','BK',0,0],
+  [0,0,'BK','BK','BK',0,0,'BK','BK','BK',0,0],
+];
+const FZ=[
+  [0,0,'WH','WH','WH','WH','WH','WH','WH',0,0,0],
+  [0,'WH','WH','WH','WH','WH','WH','WH','WH','WH',0,0],
+  [0,'WH','PU','WH','WH','WH','WH','WH','PU','WH',0,0],
+  [0,'WH','WH','WH','WH','WH','WH','WH','WH','WH',0,0],
+  [0,'WH','WH','RD','BK','WH','RD','BK','WH','WH',0,0],
+  [0,'WH','WH','WH','WH','WH','WH','WH','WH','WH',0,0],
+  [0,'WH','PU','WH','WH','WH','WH','WH','PU','WH',0,0],
+  [0,0,'WH','WH','WH','WH','WH','WH','WH',0,0,0],
+  [0,0,0,'WH','WH','WH','WH','WH',0,0,0,0],
+  [0,'WH','WH','WH','WH','WH','WH','WH','WH','WH',0,0],
+  [0,'WH','PU','WH','WH','WH','WH','WH','PU','WH',0,0],
+  ['WH','WH','WH','WH','WH','WH','WH','WH','WH','WH','WH',0],
+  [0,'PU','PU','PU','PU','PU','PU','PU','PU','PU',0,0],
+  [0,'WH','WH','PU','WH','WH','WH','PU','WH','WH',0,0],
+  [0,'WH','WH','PU','WH','WH','WH','PU','WH','WH',0,0],
+  [0,'WH','WH','PU','WH','WH','WH','PU','WH','WH',0,0],
+  [0,0,'WH','WH','WH',0,0,'WH','WH','WH',0,0],
+  [0,0,'WH','WH','WH',0,0,'WH','WH','WH',0,0],
+  [0,0,'PU','PU','PU',0,0,'PU','PU','PU',0,0],
+  [0,0,'PU','PU','PU',0,0,'PU','PU','PU',0,0],
+];
+CHARS_PARADE[1].grid=VG;
+CHARS_PARADE[2].grid=PIC;
+CHARS_PARADE[3].grid=GH;
+CHARS_PARADE[4].grid=FZ;
 
-  // ── POWER LEVEL COUNTER ──
-  function animatePL(el, target, duration) {
-    let start = null, current = 0;
-    function step(ts) {
-      if (!start) start = ts;
-      const p = Math.min(1, (ts - start) / duration);
-      current = Math.floor(p * target);
-      el.textContent = String(current).padStart(6, '0');
-      if (p < 1 && introRunning) requestAnimationFrame(step);
-      else el.textContent = String(target).padStart(6, '0');
-    }
-    requestAnimationFrame(step);
-  }
-
-  // ── PULSE ELEMENT ──
-  function pulse(el, prop, from, to, duration, cb) {
-    const start = performance.now();
-    function frame(now) {
-      const p = Math.min(1, (now - start) / duration);
-      el.style[prop] = from + (to - from) * p;
-      if (p < 1) requestAnimationFrame(frame);
-      else if (cb) cb();
-    }
-    requestAnimationFrame(frame);
-  }
-
-  // ── SHOCKWAVE ──
-  function animateShockwave(el, delay, size, color) {
-    setTimeout(() => {
-      el.style.transition = 'none';
-      el.style.width = '0px'; el.style.height = '0px';
-      el.style.borderColor = color;
-      el.style.opacity = '1';
-      el.style.marginLeft = '0'; el.style.marginBottom = '0';
-      requestAnimationFrame(() => {
-        el.style.transition = `all ${700}ms ease-out`;
-        el.style.width = size + 'px';
-        el.style.height = size * 0.35 + 'px';
-        el.style.marginLeft = -(size/2) + 'px';
-        el.style.marginBottom = -(size*0.35/2) + 'px';
-        el.style.opacity = '0';
-      });
-    }, delay);
-  }
-
-  // ── PARADE CANVAS SPEED LINES ──
-  let paradeFrame = null;
-  function startParadeLines(canvas, color) {
-    let t = 0;
-    function draw() {
-      if (!introRunning) return;
-      const ctx = canvas.getContext('2d');
-      canvas.width = canvas.offsetWidth || window.innerWidth;
-      canvas.height = canvas.offsetHeight || window.innerHeight;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const cx = canvas.width / 2;
-      for (let i = 0; i < 60; i++) {
-        const angle = (i / 60) * Math.PI * 2 + t;
-        const inner = 80;
-        const outer = 600 + Math.sin(t * 3 + i) * 100;
-        ctx.beginPath();
-        ctx.strokeStyle = i % 2 === 0 ? color : '#ffffff22';
-        ctx.lineWidth = Math.random() * 2 + 0.5;
-        ctx.globalAlpha = 0.3 + Math.sin(t * 2 + i) * 0.15;
-        ctx.moveTo(cx + Math.cos(angle) * inner, canvas.height * 0.3 + Math.sin(angle) * inner * 0.3);
-        ctx.lineTo(cx + Math.cos(angle) * outer, canvas.height * 0.3 + Math.sin(angle) * outer * 0.3);
-        ctx.stroke();
-      }
-      t += 0.04;
-      paradeFrame = requestAnimationFrame(draw);
-    }
-    draw();
-  }
-
-  // ── SHOW CHARACTER IN PARADE ──
-  function showParadeChar(charData, callback) {
-    if (!introRunning) return;
-    const img = document.getElementById('parade-img');
-    const name = document.getElementById('parade-name');
-    const quote = document.getElementById('parade-quote');
-    const aura = document.getElementById('parade-aura');
-    const spotlight = document.getElementById('char-spotlight');
-    const vsFlash = document.getElementById('vs-flash');
-
-    // Reset
-    img.style.transform = 'scale(0)';
-    name.style.opacity = '0';
-    name.style.transform = 'translateY(20px)';
-    quote.style.opacity = '0';
-    quote.style.transform = 'translateY(10px)';
-
-    // Set content
-    img.src = charData.img;
-    img.onerror = function(){ this.src = charData.fallback; this.onerror=null; };
-    name.textContent = charData.name;
-    quote.textContent = charData.quote;
-    spotlight.style.background = `radial-gradient(ellipse at 50% 0%,${charData.aura}22 0%,transparent 70%)`;
-    aura.style.background = charData.aura;
-    aura.style.boxShadow = `0 0 40px ${charData.aura}, 0 0 80px ${charData.aura}55`;
-    aura.style.filter = `blur(12px)`;
-    aura.style.opacity = '0.7';
-
-    // Update parade canvas color
-    if (paradeFrame) cancelAnimationFrame(paradeFrame);
-    startParadeLines(document.getElementById('parade-canvas'), charData.aura + '44');
-
-    // Animate in
-    setTimeout(() => {
-      img.style.transform = 'scale(1)';
-      setTimeout(() => {
-        name.style.opacity = '1';
-        name.style.transform = 'translateY(0)';
-        name.style.color = charData.aura;
-        name.style.textShadow = `0 0 20px ${charData.aura}, 0 0 40px ${charData.aura}88`;
-        setTimeout(() => {
-          quote.style.opacity = '1';
-          quote.style.transform = 'translateY(0)';
-          // Flash
-          vsFlash.style.transition = 'opacity .1s';
-          vsFlash.style.opacity = '0.6';
-          vsFlash.style.background = `radial-gradient(ellipse at center,rgba(255,255,255,.9),${charData.aura}88,transparent 60%)`;
-          setTimeout(() => {
-            vsFlash.style.transition = 'opacity .4s';
-            vsFlash.style.opacity = '0';
-            setTimeout(callback, 1400);
-          }, 80);
-        }, 300);
-      }, 200);
-    }, 100);
-  }
-
-  // ────────────────────────────────────────────────
-  // MAIN INTRO SEQUENCE
-  // ────────────────────────────────────────────────
-  async function runIntro() {
-    const sleep = ms => new Promise(r => setTimeout(r, ms));
-
-    // ── PHASE 0: Initial black with white flash ──
-    if (!introRunning) return;
-    const flash = document.getElementById('intro-flash');
-    await sleep(200);
-    flash.style.opacity = '1';
-    await sleep(80);
-    flash.style.opacity = '0';
-    await sleep(100);
-    flash.style.opacity = '1';
-    await sleep(60);
-    flash.style.opacity = '0';
-
-    // ── PHASE 1: ENERGY CHARGE ──
-    if (!introRunning) return;
-    const charge = document.getElementById('intro-charge');
-    charge.style.transition = 'opacity .3s';
-    charge.style.opacity = '1';
-
-    const scouterText = document.getElementById('scouter-text');
-    scouterText.style.transition = 'opacity .3s';
-    scouterText.style.opacity = '1';
-
-    // Animate power level counter
-    const plEl = document.getElementById('pl-number');
-    animatePL(plEl, 530000, 2500);
-
-    // Aura column rises
-    const auraCol = document.getElementById('aura-column');
-    auraCol.style.transition = 'height 2s ease-out, opacity .3s';
-    auraCol.style.opacity = '1';
-    await sleep(100);
-    auraCol.style.height = '70vh';
-
-    // Shockwaves
-    await sleep(300);
-    animateShockwave(document.getElementById('shock1'), 0, 600, '#ff6a00');
-    animateShockwave(document.getElementById('shock2'), 150, 800, '#ffd700');
-    animateShockwave(document.getElementById('shock3'), 300, 1000, '#ffffff88');
-
-    // Silhouette appears
-    await sleep(500);
-    const sil = document.getElementById('char-silhouette');
-    sil.style.transition = 'opacity .4s, filter .4s';
-    sil.style.opacity = '1';
-    sil.style.filter = 'blur(0px)';
-
-    // Aura spikes
-    const spikes = document.getElementById('aura-spikes');
-    spikes.style.transition = 'opacity .3s';
-    spikes.style.opacity = '1';
-
-    // Lightning
-    await sleep(400);
-    const lCanvas = document.getElementById('lightning-canvas');
-    lCanvas.style.transition = 'opacity .2s';
-    lCanvas.style.opacity = '1';
-    let lCount = 0;
-    const lInterval = setInterval(() => {
-      if (!introRunning) { clearInterval(lInterval); return; }
-      drawLightning(lCanvas, lCount % 2 === 0 ? '#ffd700' : '#ffffff', 8);
-      lCount++;
-      if (lCount > 20) clearInterval(lInterval);
-    }, 100);
-
-    // Scream text
-    await sleep(600);
-    if (!introRunning) return;
-    const scream = document.getElementById('scream-text');
-    scream.style.transition = 'opacity .15s, transform .15s';
-    scream.style.opacity = '1';
-    scream.style.transform = 'translate(-50%,-50%) scale(1)';
-    await sleep(200);
-    scream.style.transform = 'translate(-50%,-50%) scale(1.15)';
-    await sleep(200);
-    scream.style.transform = 'translate(-50%,-50%) scale(0.95)';
-
-    // Scouter broken
-    await sleep(400);
-    scouterText.textContent = 'IT\'S OVER 9000!!';
-    scouterText.style.color = '#ff0000';
-    scouterText.style.fontSize = '1rem';
-
-    await sleep(800);
-    if (!introRunning) return;
-
-    // Flash out of charge phase
-    flash.style.opacity = '1';
-    await sleep(80);
-    charge.style.opacity = '0';
-    flash.style.opacity = '0';
-
-    // ── PHASE 2: TITLE CARD ──
-    if (!introRunning) return;
-    const titlePhase = document.getElementById('intro-title');
-    titlePhase.style.transition = 'opacity .4s';
-    titlePhase.style.opacity = '1';
-
-    // Speed lines
-    const speedCanvas = document.getElementById('speed-canvas');
-    let speedAlpha = 0;
-    const speedInterval = setInterval(() => {
-      if (!introRunning) { clearInterval(speedInterval); return; }
-      speedAlpha = Math.min(0.4, speedAlpha + 0.02);
-      drawSpeedLines(speedCanvas, speedAlpha);
-    }, 30);
-
-    // Dragon balls drop in
-    await sleep(200);
-    if (!introRunning) return;
-    const dballs = document.getElementById('dballs-intro');
-    dballs.style.transition = 'opacity .2s';
-    dballs.style.opacity = '1';
-    const dballEls = dballs.querySelectorAll('.dball-big');
-    dballEls.forEach((d, i) => {
-      setTimeout(() => {
-        d.style.animation = `dball-drop .5s cubic-bezier(.34,1.56,.64,1) forwards, dball-glow 2s ease-in-out ${i*.1}s infinite`;
-      }, i * 100);
+function drawGrid(canvas, grid, scale) {
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  grid.forEach((row,r)=>{
+    row.forEach((v,c)=>{
+      if(!v||v===0) return;
+      ctx.fillStyle = PAL2[v]||v;
+      ctx.fillRect(c*scale, r*scale, scale, scale);
     });
+  });
+}
 
-    await sleep(600);
-    if (!introRunning) return;
-
-    // Title slams in
-    const titleEl = document.getElementById('main-title-intro');
-    titleEl.textContent = document.title.replace(' - CTF','').replace('CTF','').trim() || 'CTF ARENA';
-    // Slam effect
-    titleEl.style.transition = 'none';
-    titleEl.style.opacity = '0';
-    titleEl.style.transform = 'scale(4)';
-    await sleep(50);
-    titleEl.style.transition = 'all .35s cubic-bezier(.34,1.56,.64,1)';
-    titleEl.style.opacity = '1';
-    titleEl.style.transform = 'scale(1)';
-
-    // Screen shake
-    const intro = document.getElementById('dbz-intro');
-    intro.style.animation = 'none';
-    intro.style.transform = 'translate(-4px, -3px)';
-    await sleep(50);
-    intro.style.transform = 'translate(4px, 3px)';
-    await sleep(50);
-    intro.style.transform = 'translate(-3px, 2px)';
-    await sleep(50);
-    intro.style.transform = 'translate(0,0)';
-
-    // Subtitle
-    await sleep(300);
-    if (!introRunning) return;
-    const sub = document.getElementById('sub-title-intro');
-    sub.style.transition = 'opacity .4s, transform .4s';
-    sub.style.opacity = '1';
-    sub.style.transform = 'translateY(0)';
-
-    // Loading bar
-    await sleep(200);
-    if (!introRunning) return;
-    const plBarWrap = document.getElementById('pl-bar-wrap');
-    plBarWrap.style.transition = 'opacity .3s';
-    plBarWrap.style.opacity = '1';
-    const plBar = document.getElementById('pl-bar');
-    let barPct = 0;
-    const barInterval = setInterval(() => {
-      if (!introRunning) { clearInterval(barInterval); return; }
-      barPct = Math.min(100, barPct + 2);
-      plBar.style.width = barPct + '%';
-      if (barPct >= 100) clearInterval(barInterval);
-    }, 30);
-
-    await sleep(1800);
-    clearInterval(speedInterval);
-    if (!introRunning) return;
-
-    // Flash to characters
-    flash.style.opacity = '1';
-    await sleep(80);
-    titlePhase.style.opacity = '0';
-    flash.style.opacity = '0';
-
-    // ── PHASE 3: CHARACTER PARADE ──
-    if (!introRunning) return;
-    const charsPhase = document.getElementById('intro-chars');
-    charsPhase.style.transition = 'opacity .3s';
-    charsPhase.style.opacity = '1';
-
-    for (let i = 0; i < CHAR_DATA.length; i++) {
-      if (!introRunning) return;
-      await new Promise(resolve => {
-        showParadeChar(CHAR_DATA[i], resolve);
-      });
-      if (!introRunning) return;
-      // Flash between characters
-      if (i < CHAR_DATA.length - 1) {
-        const vsF = document.getElementById('vs-flash');
-        vsF.style.transition = 'opacity .08s';
-        vsF.style.opacity = '1';
-        vsF.style.background = 'rgba(255,255,255,.95)';
-        await sleep(80);
-        vsF.style.transition = 'opacity .3s';
-        vsF.style.opacity = '0';
-      }
-    }
-
-    if (!introRunning) return;
-
-    // Final flash → show enter button
-    flash.style.transition = 'opacity .15s';
-    flash.style.opacity = '1';
-    await sleep(150);
-    charsPhase.style.opacity = '0';
-    flash.style.opacity = '0';
-    titlePhase.style.opacity = '1';
-    titlePhase.style.transition = 'opacity .3s';
-
-    const enterBtn = document.getElementById('enter-btn');
-    enterBtn.style.display = 'block';
-    plBarWrap.style.display = 'none';
-
-    // Auto-enter after 4s if user doesn't click
-    setTimeout(() => {
-      if (introRunning) skipIntro();
-    }, 4000);
+// ── LIGHTNING ──
+function drawLightning(canvas, color, n) {
+  const ctx = canvas.getContext('2d');
+  canvas.width = canvas.offsetWidth||window.innerWidth;
+  canvas.height = canvas.offsetHeight||window.innerHeight;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  const cx=canvas.width/2, cy=canvas.height*.6;
+  for(let i=0;i<n;i++){
+    ctx.beginPath(); ctx.strokeStyle=color;
+    ctx.lineWidth=Math.random()*2+.5; ctx.globalAlpha=Math.random()*.7+.2;
+    let x=cx+(Math.random()-.5)*180, y=cy+(Math.random()-.5)*180;
+    ctx.moveTo(x,y);
+    for(let j=0;j<5;j++){x+=(Math.random()-.5)*110;y+=(Math.random()-.5)*110;ctx.lineTo(x,y);}
+    ctx.stroke();
   }
+  ctx.globalAlpha=1;
+}
 
-  // Start intro
-  runIntro();
-})();
-</script>
-"""
-
-CHARACTER_JS = """
-(function() {
-  const CHARS = [
-    {
-      id: 'goku', name: 'Goku',
-      img: 'https://www.pngmart.com/files/22/Goku-PNG-Isolated-File.png',
-      imgSSJ: 'https://www.pngmart.com/files/22/Goku-SSJ-PNG-Isolated-Photo.png',
-      width: 160, auraColor: '#ffd700', glowColor: '#ff6a00',
-      quotes: ['KAMEHAMEHA!!','I need to get stronger!','KAIO-KEN x10!','Time to power up!','This is not over yet!'],
-      fightQuotes: ['KAMEHAMEHA!!','KAIO-KEN!!','This ends NOW!'],
-      powerUpQuotes: ["I'M GOING SUPER SAIYAN!",'AAAAHHHHH!!!','FULL POWER!!'],
-      speed: 1.4, jumpHeight: 200, isSSJ: false,
-      x: 80, y: 0, vx: 1.4, state: 'walk', stateTimer: 100,
-      jumpVy: 0, isJumping: false, flipped: false,
-    },
-    {
-      id: 'vegeta', name: 'Vegeta',
-      img: 'https://www.pngmart.com/files/22/Vegeta-PNG-Isolated-Cutout.png',
-      imgSSJ: null,
-      width: 150, auraColor: '#8800ff', glowColor: '#aa00ff',
-      quotes: ['I am the PRINCE of Saiyans!','My power is MAXIMUM!','OVER 9000!!','FINAL FLASH!!','You pathetic weakling!'],
-      fightQuotes: ['FINAL FLASH!!','GALICK GUN!!','I will destroy you!'],
-      powerUpQuotes: ['MY PRIDE...!','VEGETA DOES NOT LOSE!','FINAL BURST!!'],
-      speed: 1.6, jumpHeight: 180, isSSJ: false,
-      x: 500, y: 0, vx: -1.6, state: 'walk', stateTimer: 120,
-      jumpVy: 0, isJumping: false, flipped: true,
-    },
-    {
-      id: 'piccolo', name: 'Piccolo',
-      img: 'https://www.pngmart.com/files/22/Piccolo-PNG-Free-Download.png',
-      imgSSJ: null,
-      width: 155, auraColor: '#00aa44', glowColor: '#004422',
-      quotes: ['Special Beam Cannon!','I sense a great power...','Training never ends.','MAKANKOSAPPO!!','Hmph.'],
-      fightQuotes: ['SPECIAL BEAM CANNON!!','HELLZONE GRENADE!!','You are no match for me!'],
-      powerUpQuotes: ['My power grows...','UNLIMITED POWER!!','Feel my ki!!'],
-      speed: 1.2, jumpHeight: 220, isSSJ: false,
-      x: 900, y: 0, vx: 1.2, state: 'idle', stateTimer: 200,
-      jumpVy: 0, isJumping: false, flipped: false,
-    },
-    {
-      id: 'frieza', name: 'Frieza',
-      img: 'https://www.pngmart.com/files/22/Frieza-PNG-File.png',
-      imgSSJ: null,
-      width: 145, auraColor: '#cc44ff', glowColor: '#880088',
-      quotes: ["I am the greatest in the universe!",'Pathetic creatures...','DEATH BEAM!!','No one can stop me!','Kneel before me!'],
-      fightQuotes: ['DEATH BALL!!','SUPERNOVA!!','You will all perish!'],
-      powerUpQuotes: ['100% POWER!!','UNLIMITED POWER!!','TREMBLE BEFORE ME!!'],
-      speed: 1.3, jumpHeight: 230, isSSJ: false,
-      x: 1100, y: 0, vx: -1.3, state: 'float', stateTimer: 180,
-      jumpVy: 0, isJumping: false, flipped: true,
-    },
-    {
-      id: 'gohan', name: 'Gohan',
-      img: 'https://www.pngmart.com/files/22/Gohan-PNG-Free-Download.png',
-      imgSSJ: null,
-      width: 148, auraColor: '#ffd700', glowColor: '#ff6600',
-      quotes: ["It's over!","I won't let you hurt them!",'MASENKO!!','SSJ2 UNLOCKED!!','THIS POWER...!'],
-      fightQuotes: ['MASENKO HA!!','FATHER-SON KAMEHAMEHA!!','THIS ENDS NOW!!'],
-      powerUpQuotes: ['RAAAHHHHH!!!','SSJ2!!!','UNLIMITED POWER!!!'],
-      speed: 1.5, jumpHeight: 195, isSSJ: false,
-      x: 300, y: 0, vx: -1.5, state: 'walk', stateTimer: 110,
-      jumpVy: 0, isJumping: false, flipped: true,
-    },
-  ];
-
-  const FALLBACK_IMGS = {
-    goku:    'https://static.wikia.nocookie.net/dragonball/images/5/5b/Goku_SSJ_Namek_Saga.png',
-    vegeta:  'https://static.wikia.nocookie.net/dragonball/images/8/8b/VegetavsGokuEp.png',
-    piccolo: 'https://static.wikia.nocookie.net/dragonball/images/3/33/PiccoloNV.png',
-    frieza:  'https://static.wikia.nocookie.net/dragonball/images/6/6c/FriezaFinalForm.png',
-    gohan:   'https://static.wikia.nocookie.net/dragonball/images/5/5b/GohanSSJ2Cell.png',
-  };
-
-  const GRAVITY = 0.75;
-  let frameCount = 0;
-  let elements = {};
-
-  function init() {
-    const layer = document.getElementById('characters-layer');
-    if (!layer) return;
-    CHARS.forEach(char => {
-      const wrap = document.createElement('div');
-      wrap.id = 'char-' + char.id;
-      wrap.style.cssText = `position:absolute;bottom:0;left:${char.x}px;width:${char.width}px;pointer-events:auto;cursor:pointer;z-index:4;transition:filter 0.3s;`;
-      const aura = document.createElement('div');
-      aura.id = 'aura-' + char.id;
-      aura.style.cssText = `position:absolute;bottom:-10px;left:50%;transform:translateX(-50%);width:80%;height:30px;background:${char.auraColor};border-radius:50%;filter:blur(14px);opacity:0.55;animation:auraPulse 1.8s ease-in-out infinite alternate;pointer-events:none;z-index:1;`;
-      wrap.appendChild(aura);
-      const img = document.createElement('img');
-      img.src = char.img;
-      img.alt = char.name;
-      img.crossOrigin = 'anonymous';
-      img.style.cssText = `width:100%;height:auto;display:block;position:relative;z-index:2;filter:drop-shadow(0 0 12px ${char.auraColor}) drop-shadow(0 4px 8px rgba(0,0,0,0.85));`;
-      img.onerror = function() { if (this.src !== FALLBACK_IMGS[char.id]) { this.src = FALLBACK_IMGS[char.id] || ''; } this.onerror = null; };
-      wrap.appendChild(img);
-      const bubble = document.createElement('div');
-      bubble.id = 'bubble-' + char.id;
-      bubble.style.cssText = `position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%);background:rgba(8,4,0,0.95);border:2px solid #ff6a00;border-radius:10px;padding:7px 14px;white-space:nowrap;font-family:'Bangers',cursive;font-size:1rem;letter-spacing:0.08em;color:#ffd700;opacity:0;transition:opacity 0.3s;pointer-events:none;z-index:10;box-shadow:0 0 18px rgba(255,106,0,0.5);text-align:center;min-width:90px;`;
-      const tail = document.createElement('div');
-      tail.style.cssText = `position:absolute;top:100%;left:50%;transform:translateX(-50%);border:7px solid transparent;border-top-color:#ff6a00;`;
-      bubble.appendChild(tail);
-      wrap.appendChild(bubble);
-      const nameTag = document.createElement('div');
-      nameTag.style.cssText = `text-align:center;font-family:'Bangers',cursive;font-size:0.85rem;letter-spacing:0.15em;color:${char.auraColor};text-shadow:0 0 8px ${char.auraColor};margin-top:2px;position:relative;z-index:2;`;
-      nameTag.textContent = char.name.toUpperCase();
-      wrap.appendChild(nameTag);
-      layer.appendChild(wrap);
-      elements[char.id] = { wrap, img, bubble, aura, nameTag };
-      wrap.addEventListener('click', function(e) {
-        e.stopPropagation();
-        doJump(char);
-        showBubble(char, char.quotes[Math.floor(Math.random() * char.quotes.length)]);
-        spawnExplosion(char.x + char.width / 2, window.innerHeight - 80, char.auraColor);
-      });
-    });
-    requestAnimationFrame(tick);
-    setInterval(randomSpeech, 4000);
-    setInterval(randomInteraction, 7000);
-    setInterval(randomPowerUp, 13000);
+// ── SPEED LINES ──
+function drawSpeed(canvas) {
+  const ctx = canvas.getContext('2d');
+  canvas.width=canvas.offsetWidth||window.innerWidth;
+  canvas.height=canvas.offsetHeight||window.innerHeight;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  const cx=canvas.width/2, cy=canvas.height/2;
+  for(let i=0;i<70;i++){
+    const a=(i/70)*Math.PI*2;
+    const inner=50+Math.random()*30;
+    const outer=Math.max(canvas.width,canvas.height)*1.2;
+    ctx.beginPath();
+    ctx.strokeStyle=i%3===0?'#ffd700':i%3===1?'#ff6a00':'#ffffff33';
+    ctx.lineWidth=Math.random()*2.5+.3;
+    ctx.globalAlpha=.25+Math.random()*.25;
+    ctx.moveTo(cx+Math.cos(a)*inner,cy+Math.sin(a)*inner);
+    ctx.lineTo(cx+Math.cos(a)*outer,cy+Math.sin(a)*outer);
+    ctx.stroke();
   }
+  ctx.globalAlpha=1;
+}
 
-  function tick() {
-    frameCount++;
-    const W = window.innerWidth;
-    CHARS.forEach(char => {
-      const el = elements[char.id];
-      if (!el) return;
-      char.stateTimer--;
-      if (char.stateTimer <= 0) changeState(char);
-      if (char.isJumping) {
-        char.jumpVy += GRAVITY;
-        char.y -= char.jumpVy;
-        if (char.y <= 0) { char.y = 0; char.isJumping = false; char.jumpVy = 0; }
-      }
-      if (char.state === 'walk')  char.x += char.vx;
-      if (char.state === 'run')   char.x += char.vx * 2.8;
-      if (char.state === 'fight') char.x += char.vx * 1.4;
-      if (char.state === 'float') { char.x += char.vx * 0.7; char.y = 28 + Math.sin(frameCount * 0.018 + char.x * 0.008) * 22; }
-      if (char.x > W - char.width - 10) { char.x = W - char.width - 10; char.vx = -Math.abs(char.vx); char.flipped = true; }
-      if (char.x < 10) { char.x = 10; char.vx = Math.abs(char.vx); char.flipped = false; }
-      el.wrap.style.left = char.x + 'px';
-      el.wrap.style.bottom = (char.isJumping || char.state === 'float' ? Math.max(0, char.y) : 0) + 'px';
-      el.wrap.style.transform = char.flipped ? 'scaleX(-1)' : 'scaleX(1)';
-      if (char.state === 'powerup') {
-        el.aura.style.opacity = '0.95'; el.aura.style.width = '110%'; el.aura.style.height = '50px';
-        el.wrap.style.filter = `drop-shadow(0 0 25px ${char.auraColor}) drop-shadow(0 0 50px ${char.glowColor}) brightness(1.3)`;
-      } else if (char.state === 'fight') {
-        el.aura.style.opacity = '0.75'; el.aura.style.width = '90%'; el.aura.style.height = '35px';
-        el.wrap.style.filter = `drop-shadow(0 0 18px ${char.auraColor}) drop-shadow(0 4px 8px rgba(0,0,0,0.8))`;
-      } else {
-        el.aura.style.opacity = '0.5'; el.aura.style.width = '80%'; el.aura.style.height = '28px';
-        el.wrap.style.filter = `drop-shadow(0 0 12px ${char.auraColor}) drop-shadow(0 4px 8px rgba(0,0,0,0.85))`;
-      }
-    });
-    requestAnimationFrame(tick);
+function drawParadeLines(canvas,color,t){
+  const ctx=canvas.getContext('2d');
+  canvas.width=canvas.offsetWidth||window.innerWidth;
+  canvas.height=canvas.offsetHeight||window.innerHeight;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  const cx=canvas.width/2;
+  for(let i=0;i<55;i++){
+    const a=(i/55)*Math.PI*2+t;
+    const inner=60;
+    const outer=550+Math.sin(t*3+i)*80;
+    ctx.beginPath(); ctx.strokeStyle=i%2===0?color:'#ffffff18';
+    ctx.lineWidth=Math.random()*1.8+.3;
+    ctx.globalAlpha=.25+Math.sin(t*2+i)*.12;
+    ctx.moveTo(cx+Math.cos(a)*inner, canvas.height*.35+Math.sin(a)*inner*.3);
+    ctx.lineTo(cx+Math.cos(a)*outer, canvas.height*.35+Math.sin(a)*outer*.3);
+    ctx.stroke();
   }
+  ctx.globalAlpha=1;
+}
 
-  function changeState(char) {
-    const r = Math.random();
-    if      (r < 0.30) { char.state='walk';  char.stateTimer=100+Math.random()*160; }
-    else if (r < 0.44) { char.state='run';   char.stateTimer=35+Math.random()*55; char.vx=(Math.random()>.5?1:-1)*char.speed; char.flipped=char.vx<0; }
-    else if (r < 0.56) { char.state='idle';  char.stateTimer=90+Math.random()*130; }
-    else if (r < 0.67) { char.state='jump';  char.stateTimer=55; doJump(char); }
-    else if (r < 0.78) { char.state='fight'; char.stateTimer=50+Math.random()*70; }
-    else if (char.id === 'frieza') { char.state='float'; char.stateTimer=140+Math.random()*140; }
-    else { char.state='walk'; char.stateTimer=120; }
-  }
+// ── DRAGON BALLS ──
+function makeDball(size){
+  const c=document.createElement('canvas'); c.width=size; c.height=size;
+  const ctx=c.getContext('2d');
+  const g=ctx.createRadialGradient(size*.35,size*.35,0,size*.5,size*.5,size*.5);
+  g.addColorStop(0,'#fffcdd'); g.addColorStop(.4,'#ffd700'); g.addColorStop(.8,'#ff6a00'); g.addColorStop(1,'#8b4500');
+  ctx.beginPath(); ctx.arc(size/2,size/2,size/2,0,Math.PI*2); ctx.fillStyle=g; ctx.fill();
+  ctx.fillStyle='#cc3300';
+  [[.5,.38],[.38,.5],[.62,.5],[.5,.62],[.38,.38],[.62,.62],[.5,.5]].forEach(([x,y],i)=>{
+    ctx.beginPath(); ctx.arc(x*size,y*size,size*.07,0,Math.PI*2);
+    if(i<7)ctx.fill();
+  });
+  return c.toDataURL();
+}
 
-  function doJump(char) { if (!char.isJumping) { char.isJumping = true; char.jumpVy = -(char.jumpHeight * 0.20); } }
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+let running = true;
 
-  function showBubble(char, text) {
-    const el = elements[char.id];
-    if (!el) return;
-    const existing = el.bubble.querySelector('.bubble-text');
-    if (existing) existing.remove();
-    const span = document.createElement('span');
-    span.className = 'bubble-text';
-    span.textContent = text;
-    el.bubble.insertBefore(span, el.bubble.firstChild);
-    el.bubble.style.opacity = '1';
-    setTimeout(() => { el.bubble.style.opacity = '0'; }, 2400);
-  }
+window.__dbzSkip = function(){
+  running=false;
+  const intro=document.getElementById('dbz-intro');
+  intro.style.transition='opacity .4s'; intro.style.opacity='0';
+  setTimeout(()=>{ intro.style.display='none'; sessionStorage.setItem('dbz_done','1'); },400);
+};
 
-  function randomSpeech() {
-    const char = CHARS[Math.floor(Math.random() * CHARS.length)];
-    const pool = char.state==='fight' ? char.fightQuotes : char.state==='powerup' ? char.powerUpQuotes : char.quotes;
-    showBubble(char, pool[Math.floor(Math.random() * pool.length)]);
-  }
+async function run(){
+  const iFlash=document.getElementById('iFlash');
+  const iCharge=document.getElementById('iCharge');
+  const iTitle=document.getElementById('iTitle');
+  const iParade=document.getElementById('iParade');
 
-  function randomInteraction() {
-    if (CHARS.length < 2) return;
-    let i = Math.floor(Math.random() * CHARS.length);
-    let j = Math.floor(Math.random() * CHARS.length);
-    while (j === i) j = Math.floor(Math.random() * CHARS.length);
-    const from = CHARS[i], to = CHARS[j];
-    showBubble(from, from.fightQuotes[Math.floor(Math.random() * from.fightQuotes.length)]);
-    from.state = 'fight'; from.stateTimer = 70;
-    spawnKiBlast(from, to);
-  }
-
-  function spawnKiBlast(from, to) {
-    const blast = document.createElement('div');
-    const size = 18 + Math.random() * 14;
-    const startX = from.x + from.width / 2, startY = window.innerHeight - 120;
-    const endX = to.x + to.width / 2, endY = window.innerHeight - 120;
-    blast.style.cssText = `position:fixed;left:${startX}px;top:${startY}px;width:${size}px;height:${size}px;border-radius:50%;background:radial-gradient(circle,#fff 0%,${from.auraColor} 50%,transparent 100%);box-shadow:0 0 20px ${from.auraColor},0 0 40px ${from.glowColor};pointer-events:none;z-index:6;transform:translate(-50%,-50%);`;
-    document.body.appendChild(blast);
-    const dx = endX - startX, dy = endY - startY;
-    const dist = Math.sqrt(dx*dx + dy*dy);
-    const dur = Math.max(250, dist * 0.7);
-    let start = null;
-    function anim(ts) {
-      if (!start) start = ts;
-      const p = Math.min(1, (ts - start) / dur);
-      const arcY = -130 * Math.sin(Math.PI * p);
-      blast.style.left = (startX + dx * p) + 'px';
-      blast.style.top = (startY + dy * p + arcY) + 'px';
-      blast.style.opacity = String(1 - p * 0.3);
-      blast.style.transform = `translate(-50%,-50%) scale(${1 + p * 0.5})`;
-      if (p < 1) { requestAnimationFrame(anim); }
-      else { spawnExplosion(endX, endY, from.auraColor); blast.remove(); const toChar = CHARS.find(c => c.id === to.id); if (toChar) showBubble(toChar, toChar.quotes[Math.floor(Math.random() * toChar.quotes.length)]); }
-    }
-    requestAnimationFrame(anim);
-  }
-
-  function spawnExplosion(x, y, color) {
-    for (let i = 0; i < 7; i++) {
-      const exp = document.createElement('div');
-      const sz = 24 + Math.random() * 36;
-      const ox = (Math.random() - 0.5) * 60, oy = (Math.random() - 0.5) * 40;
-      exp.style.cssText = `position:fixed;left:${x+ox-sz/2}px;top:${y+oy-sz/2}px;width:${sz}px;height:${sz}px;border-radius:50%;background:radial-gradient(circle,#fff 0%,${color} 40%,transparent 100%);box-shadow:0 0 30px ${color};pointer-events:none;z-index:7;animation:explodeAnim 0.6s ease-out forwards;animation-delay:${i*0.04}s;`;
-      document.body.appendChild(exp);
-      setTimeout(() => exp.remove(), 700 + i * 45);
-    }
-  }
-
-  function randomPowerUp() {
-    const char = CHARS[Math.floor(Math.random() * CHARS.length)];
-    const el = elements[char.id];
-    if (!el) return;
-    char.state = 'powerup'; char.stateTimer = 130;
-    showBubble(char, char.powerUpQuotes[Math.floor(Math.random() * char.powerUpQuotes.length)]);
-    spawnExplosion(char.x + char.width/2, window.innerHeight - 80, char.auraColor);
-    if (char.id === 'goku' && char.imgSSJ && !char.isSSJ && Math.random() > 0.35) {
-      char.isSSJ = true;
-      el.img.src = char.imgSSJ;
-      el.aura.style.background = '#ffd700'; el.aura.style.height = '60px'; el.aura.style.opacity = '0.9';
-      el.wrap.style.filter = 'drop-shadow(0 0 30px #ffd700) drop-shadow(0 0 60px #ff6a00) brightness(1.4)';
-      setTimeout(() => {
-        char.isSSJ = false; el.img.src = char.img;
-        el.aura.style.background = char.auraColor; el.aura.style.height = '28px'; el.aura.style.opacity = '0.5';
-      }, 18000);
-    }
-  }
-
-  document.addEventListener('click', function(e) {
-    if (e.target.closest && e.target.closest('#characters-layer')) return;
-    spawnKiParticle(e.clientX, e.clientY);
+  const fade=(el,o,d=300)=>new Promise(r=>{
+    el.style.transition=`opacity ${d}ms`;
+    el.style.opacity=o;
+    setTimeout(r,d+20);
   });
 
-  function spawnKiParticle(x, y) {
-    const p = document.createElement('div');
-    p.className = 'ki-particle';
-    const s = 10 + Math.random() * 15;
-    p.style.cssText = `left:${x-s/2}px;top:${y-s/2}px;width:${s}px;height:${s}px`;
-    document.body.appendChild(p);
-    setTimeout(() => p.remove(), 600);
+  // ── PHASE 0: Flash ──
+  await sleep(150);
+  if(!running)return;
+  await fade(iFlash,1,60); await fade(iFlash,0,60);
+  await sleep(80);
+  await fade(iFlash,1,50); await fade(iFlash,0,80);
+
+  // ── PHASE 1: Energy Charge ──
+  if(!running)return;
+  await fade(iCharge,1,300);
+
+  const scout=document.getElementById('iScout');
+  scout.style.transition='opacity .3s'; scout.style.opacity='1';
+
+  // Power level count
+  const plEl=document.getElementById('iPL');
+  let plVal=0, plTarget=530000;
+  const plInterval=setInterval(()=>{
+    if(!running){clearInterval(plInterval);return;}
+    plVal=Math.min(plVal+Math.floor(plTarget/120)+1000,plTarget);
+    plEl.textContent=String(plVal).padStart(6,'0');
+    if(plVal>=plTarget)clearInterval(plInterval);
+  },20);
+
+  // Aura rise
+  const iAura=document.getElementById('iAura');
+  iAura.style.transition='height 2s ease-out,opacity .3s';
+  iAura.style.opacity='0.9';
+  setTimeout(()=>{iAura.style.height='70vh';},50);
+
+  // Pixel silhouette
+  const silCanvas=document.getElementById('iSilCanvas');
+  silCanvas.width=120; silCanvas.height=160;
+  drawGrid(silCanvas,GOKU_GRID,10);
+  const iSil=document.getElementById('iSil');
+  await sleep(500);
+  if(!running)return;
+  iSil.style.transition='opacity .4s'; iSil.style.opacity='1';
+
+  // Shockwaves
+  const shockWrap=document.getElementById('iShockWrap');
+  [['#ff6a00',600,0],['#ffd700',800,150],['#ffffff88',1000,300]].forEach(([col,size,delay])=>{
+    setTimeout(()=>{
+      const s=document.createElement('div');
+      s.style.cssText=`position:absolute;left:50%;top:50%;border-radius:50%;border:3px solid ${col};width:0;height:0;margin-left:0;margin-top:0;opacity:1;transition:all 700ms ease-out;`;
+      shockWrap.appendChild(s);
+      setTimeout(()=>{
+        s.style.width=size+'px'; s.style.height=Math.round(size*.35)+'px';
+        s.style.marginLeft=-(size/2)+'px'; s.style.marginTop=-(size*.175)+'px';
+        s.style.opacity='0';
+      },30);
+      setTimeout(()=>s.remove(),800);
+    },delay);
+  });
+
+  // Lightning
+  await sleep(600);
+  if(!running)return;
+  const lc=document.getElementById('iLCanvas');
+  lc.style.transition='opacity .2s'; lc.style.opacity='0.8';
+  let lTick=0;
+  const lInterval=setInterval(()=>{
+    if(!running){clearInterval(lInterval);return;}
+    drawLightning(lc,lTick%2===0?'#ffd700':'#fff',7);
+    if(++lTick>18)clearInterval(lInterval);
+  },100);
+
+  // Scream
+  await sleep(400);
+  if(!running)return;
+  const scr=document.getElementById('iScream');
+  scr.style.opacity='1'; scr.style.transform='translate(-50%,-50%) scale(1)';
+  await sleep(180); scr.style.transform='translate(-50%,-50%) scale(1.12)';
+  await sleep(180); scr.style.transform='translate(-50%,-50%) scale(0.97)';
+
+  // Scouter breaks
+  await sleep(350);
+  if(!running)return;
+  scout.textContent="IT'S OVER 9000!!";
+  scout.style.color='#ff0000'; scout.style.fontSize='1rem';
+
+  await sleep(700);
+  if(!running)return;
+
+  // Flash transition
+  await fade(iFlash,1,70);
+  iCharge.style.opacity='0';
+  await fade(iFlash,0,80);
+
+  // ── PHASE 2: Title ──
+  if(!running)return;
+  await fade(iTitle,1,350);
+
+  // Speed lines
+  const sc=document.getElementById('iSpeedCanvas');
+  drawSpeed(sc);
+
+  // Dragon balls
+  const dbWrap=document.getElementById('iDBalls');
+  const dbImg=makeDball(30);
+  for(let i=0;i<7;i++){
+    const img=document.createElement('img');
+    img.src=dbImg; img.width=30; img.height=30;
+    img.style.cssText=`border-radius:50%;box-shadow:0 0 10px rgba(255,215,0,.5);animation:dballspin 2s ease-in-out ${i*.12}s infinite;transform:translateY(-30px);opacity:0;transition:transform .45s cubic-bezier(.34,1.56,.64,1) ${i*.08}s, opacity .3s ${i*.08}s;`;
+    dbWrap.appendChild(img);
+  }
+  dbWrap.style.transition='opacity .2s'; dbWrap.style.opacity='1';
+  await sleep(50);
+  dbWrap.querySelectorAll('img').forEach(img=>{ img.style.transform='translateY(0)'; img.style.opacity='1'; });
+
+  await sleep(500);
+  if(!running)return;
+
+  // Title slam
+  const tEl=document.getElementById('iTitleText');
+  const pgTitle=document.title.replace(/\s*-.*$/,'').trim()||'CTF';
+  tEl.textContent=pgTitle;
+  tEl.style.transition='none'; tEl.style.opacity='0'; tEl.style.transform='scale(4)';
+  await sleep(30);
+  tEl.style.transition='all .3s cubic-bezier(.34,1.56,.64,1)';
+  tEl.style.opacity='1'; tEl.style.transform='scale(1)';
+
+  // Screen shake
+  const intro=document.getElementById('dbz-intro');
+  ['-4px,2px','4px,-3px','-2px,3px','1px,-1px','0,0'].forEach((t,i)=>{
+    setTimeout(()=>{const[x,y]=t.split(',');intro.style.transform=`translate(${x},${y})`;},i*45);
+  });
+
+  await sleep(280);
+  if(!running)return;
+
+  const sub=document.getElementById('iSub');
+  sub.style.transition='opacity .4s,transform .4s'; sub.style.opacity='1'; sub.style.transform='translateY(0)';
+
+  // Loading bar
+  await sleep(200);
+  if(!running)return;
+  const bWrap=document.getElementById('iBarWrap');
+  bWrap.style.transition='opacity .3s'; bWrap.style.opacity='1';
+  const bar=document.getElementById('iBar');
+  let bp=0;
+  const barInterval=setInterval(()=>{
+    if(!running){clearInterval(barInterval);return;}
+    bp=Math.min(100,bp+2);
+    bar.style.width=bp+'%';
+    if(bp>=100)clearInterval(barInterval);
+  },28);
+
+  await sleep(1700);
+  if(!running)return;
+
+  // Flash to parade
+  await fade(iFlash,1,70);
+  iTitle.style.opacity='0';
+  await fade(iFlash,0,80);
+
+  // ── PHASE 3: Character Parade ──
+  if(!running)return;
+  await fade(iParade,1,300);
+
+  let parT=0;
+  const pCanvas=document.getElementById('iParadeCanvas');
+  let parAF=null;
+  function paradeLoop(){
+    if(!running)return;
+    drawParadeLines(pCanvas,CHARS_PARADE[Math.min(charIdx,CHARS_PARADE.length-1)].aura+'88',parT);
+    parT+=0.04;
+    parAF=requestAnimationFrame(paradeLoop);
+  }
+  let charIdx=0;
+  paradeLoop();
+
+  const cCanvas=document.getElementById('iCharCanvas');
+  cCanvas.width=120; cCanvas.height=160;
+  const cName=document.getElementById('iCharName');
+  const cQuote=document.getElementById('iCharQuote');
+  const vsFlash=document.getElementById('iVsFlash');
+
+  for(charIdx=0;charIdx<CHARS_PARADE.length;charIdx++){
+    if(!running)break;
+    const cd=CHARS_PARADE[charIdx];
+    // Reset
+    cCanvas.style.transform='scale(0)';
+    cName.style.opacity='0'; cName.style.transform='translateY(16px)';
+    cQuote.style.opacity='0'; cQuote.style.transform='translateY(8px)';
+    vsFlash.style.opacity='0';
+
+    await sleep(80);
+    if(!running)break;
+
+    drawGrid(cCanvas,cd.grid,10);
+    cName.textContent=cd.name;
+    cName.style.color=cd.aura;
+    cName.style.textShadow=`0 0 20px ${cd.aura}`;
+    cQuote.textContent=cd.quote;
+    cCanvas.style.filter=`drop-shadow(0 0 20px ${cd.aura}) drop-shadow(0 0 40px ${cd.aura}88)`;
+
+    cCanvas.style.transform='scale(1)';
+    await sleep(350);
+    if(!running)break;
+    cName.style.opacity='1'; cName.style.transform='translateY(0)';
+    await sleep(280);
+    if(!running)break;
+    cQuote.style.opacity='1'; cQuote.style.transform='translateY(0)';
+
+    // Flash
+    await sleep(120);
+    if(!running)break;
+    vsFlash.style.transition='opacity .08s'; vsFlash.style.background=`radial-gradient(ellipse at center,rgba(255,255,255,.88),${cd.aura}66,transparent 60%)`;
+    vsFlash.style.opacity='0.6';
+    await sleep(80); vsFlash.style.transition='opacity .35s'; vsFlash.style.opacity='0';
+    await sleep(charIdx<CHARS_PARADE.length-1?1200:600);
   }
 
-  if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); }
-  else { setTimeout(init, 100); }
-  window.dbzSpawnExplosion = spawnExplosion;
+  if(parAF) cancelAnimationFrame(parAF);
+  if(!running)return;
+
+  // Final: show enter button
+  await fade(iFlash,1,80);
+  iParade.style.opacity='0';
+  await fade(iFlash,0,80);
+  iTitle.style.opacity='1';
+  const enterBtn=document.getElementById('iEnterBtn');
+  const barWrapEl=document.getElementById('iBarWrap');
+  if(enterBtn) enterBtn.style.display='block';
+  if(barWrapEl) barWrapEl.style.display='none';
+
+  // Auto-dismiss after 4s
+  setTimeout(()=>{ if(running && window.__dbzSkip) window.__dbzSkip(); },4000);
+}
+
+run();
 })();
+</script>
 """
 
 BASE_STYLE = """
@@ -1049,23 +1184,22 @@ BASE_STYLE = """
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
 body{background:var(--dark);color:#f5e6c8;font-family:'Rajdhani',sans-serif;min-height:100vh;overflow-x:hidden;cursor:crosshair}
-body::before{content:'';position:fixed;inset:0;z-index:0;background:radial-gradient(ellipse 80% 60% at 50% 0%,#ff6a0022 0%,transparent 70%),radial-gradient(ellipse 40% 40% at 80% 80%,#ffd70011 0%,transparent 60%),linear-gradient(180deg,#0a0500 0%,#0d0300 50%,#080200 100%);pointer-events:none}
-body::after{content:'';position:fixed;inset:0;z-index:0;background-image:radial-gradient(circle 1px at 20% 30%,#ff6a0033 0%,transparent 1px),radial-gradient(circle 1px at 80% 70%,#ffd70022 0%,transparent 1px),radial-gradient(circle 2px at 10% 80%,#ff6a0044 0%,transparent 2px),radial-gradient(circle 1px at 90% 20%,#ffd70033 0%,transparent 1px);animation:stardrift 20s linear infinite;pointer-events:none}
+body::before{content:'';position:fixed;inset:0;z-index:0;background:radial-gradient(ellipse 80% 60% at 50% 0%,#ff6a0022,transparent 70%),radial-gradient(ellipse 40% 40% at 80% 80%,#ffd70011,transparent 60%),linear-gradient(180deg,#0a0500,#0d0300 50%,#080200);pointer-events:none}
+body::after{content:'';position:fixed;inset:0;z-index:0;background-image:radial-gradient(circle 1px at 20% 30%,#ff6a0033,transparent 1px),radial-gradient(circle 1px at 80% 70%,#ffd70022,transparent 1px),radial-gradient(circle 2px at 10% 80%,#ff6a0044,transparent 2px),radial-gradient(circle 1px at 90% 20%,#ffd70033,transparent 1px);animation:stardrift 20s linear infinite;pointer-events:none}
 @keyframes stardrift{0%{transform:translateY(0)}100%{transform:translateY(-100px)}}
 #characters-layer{position:fixed;inset:0;z-index:4;pointer-events:none;overflow:hidden}
 #characters-layer > div{pointer-events:auto}
-@keyframes auraPulse{0%{opacity:.35;transform:translateX(-50%) scale(.85)}100%{opacity:.75;transform:translateX(-50%) scale(1.15)}}
-@keyframes explodeAnim{0%{transform:scale(0);opacity:1}60%{opacity:.8}100%{transform:scale(4);opacity:0}}
+@keyframes explosion{0%{transform:scale(0);opacity:1}60%{opacity:.8}100%{transform:scale(4);opacity:0}}
 .energy-lines{position:fixed;inset:0;z-index:1;pointer-events:none;overflow:hidden}
 .energy-lines span{position:absolute;height:1px;background:linear-gradient(90deg,transparent,#ff6a0055,transparent);animation:energyflow 3s linear infinite;opacity:0}
 @keyframes energyflow{0%{opacity:0;transform:scaleX(0) translateX(-100%)}20%{opacity:1}80%{opacity:1}100%{opacity:0;transform:scaleX(1) translateX(100%)}}
-.header{position:sticky;top:0;z-index:100;padding:1rem 2rem;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(180deg,rgba(10,5,0,.98) 0%,rgba(10,5,0,.9) 100%);border-bottom:2px solid var(--orange);box-shadow:0 2px 30px #ff6a0044,0 0 60px #ff6a0011}
+.header{position:sticky;top:0;z-index:100;padding:1rem 2rem;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(180deg,rgba(10,5,0,.98),rgba(10,5,0,.9));border-bottom:2px solid var(--orange);box-shadow:0 2px 30px #ff6a0044}
 .header::after{content:'';position:absolute;bottom:-4px;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--yellow),var(--orange),var(--yellow),transparent);animation:headershine 3s linear infinite}
 @keyframes headershine{0%{opacity:.3}50%{opacity:1}100%{opacity:.3}}
-.logo{font-family:'Bangers',cursive;font-size:2rem;letter-spacing:.15em;text-decoration:none;background:linear-gradient(135deg,var(--yellow) 0%,var(--orange) 50%,var(--red) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 10px #ff6a0088);transition:filter .3s}
+.logo{font-family:'Bangers',cursive;font-size:2rem;letter-spacing:.15em;text-decoration:none;background:linear-gradient(135deg,var(--yellow),var(--orange),var(--red));-webkit-background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 10px #ff6a0088);transition:filter .3s}
 .logo:hover{filter:drop-shadow(0 0 20px #ffd700)}
-.logo span{background:linear-gradient(135deg,#fff 0%,var(--yellow) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.power-level{font-family:'Bangers',cursive;font-size:.9rem;letter-spacing:.1em;color:var(--yellow);border:1px solid var(--orange);padding:4px 12px;border-radius:2px;background:rgba(255,106,0,.1);box-shadow:0 0 10px #ff6a0033;animation:powerpulse 2s ease-in-out infinite}
+.logo span{background:linear-gradient(135deg,#fff,var(--yellow));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.power-level{font-family:'Bangers',cursive;font-size:.9rem;letter-spacing:.1em;color:var(--yellow);border:1px solid var(--orange);padding:4px 12px;border-radius:2px;background:rgba(255,106,0,.1);animation:powerpulse 2s ease-in-out infinite}
 @keyframes powerpulse{0%,100%{box-shadow:0 0 10px #ff6a0033}50%{box-shadow:0 0 20px #ff6a0077}}
 nav{display:flex;align-items:center;gap:1.5rem}
 nav a{color:#c8a878;text-decoration:none;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:.85rem;letter-spacing:.15em;text-transform:uppercase;transition:all .2s;position:relative}
@@ -1134,7 +1268,7 @@ tr:hover td{background:rgba(255,106,0,.05)}
 @keyframes radarping{0%{transform:scale(.3);opacity:1}100%{transform:scale(1.5);opacity:0}}
 .radar-dot{position:absolute;top:50%;left:50%;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle,#fff,var(--yellow),var(--orange));transform:translate(-50%,-50%);box-shadow:0 0 20px var(--yellow),0 0 40px var(--orange);animation:dotpulse 1s ease-in-out infinite alternate}
 @keyframes dotpulse{0%{transform:translate(-50%,-50%) scale(1)}100%{transform:translate(-50%,-50%) scale(1.3)}}
-.hero-title{font-family:'Bangers',cursive;font-size:clamp(2.5rem,8vw,5.5rem);letter-spacing:.1em;line-height:1;margin-bottom:.5rem;background:linear-gradient(135deg,#fff 0%,var(--yellow) 30%,var(--orange) 60%,var(--red) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 20px #ff6a0088);animation:titlepulse 3s ease-in-out infinite}
+.hero-title{font-family:'Bangers',cursive;font-size:clamp(2.5rem,8vw,5.5rem);letter-spacing:.1em;line-height:1;margin-bottom:.5rem;background:linear-gradient(135deg,#fff,var(--yellow) 30%,var(--orange) 60%,var(--red));-webkit-background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 20px #ff6a0088);animation:titlepulse 3s ease-in-out infinite}
 @keyframes titlepulse{0%,100%{filter:drop-shadow(0 0 20px #ff6a0088)}50%{filter:drop-shadow(0 0 40px #ffd70088) drop-shadow(0 0 60px #ff6a0066)}}
 .hero-subtitle{font-family:'Bangers',cursive;font-size:1.1rem;letter-spacing:.3em;color:var(--orange);margin-bottom:2rem;opacity:.8}
 .power-display{display:inline-block;background:rgba(0,0,0,.7);border:2px solid var(--orange);padding:.75rem 2.5rem;border-radius:4px;margin-bottom:2rem;box-shadow:0 0 30px #ff6a0044;position:relative;overflow:hidden}
@@ -1142,7 +1276,7 @@ tr:hover td{background:rgba(255,106,0,.05)}
 @keyframes scanline{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
 .power-label{font-size:.7rem;color:#c8a878;letter-spacing:.3em;margin-bottom:.25rem;font-weight:700;text-transform:uppercase}
 .power-number{font-family:'Bangers',cursive;font-size:2.5rem;color:var(--yellow);letter-spacing:.1em}
-.stats-bar{display:flex;justify-content:center;gap:0;max-width:700px;margin:0 auto 2rem;border:1px solid rgba(255,106,0,.3);background:rgba(0,0,0,.5);border-radius:4px;overflow:hidden}
+.stats-bar{display:flex;justify-content:center;max-width:700px;margin:0 auto 2rem;border:1px solid rgba(255,106,0,.3);background:rgba(0,0,0,.5);border-radius:4px;overflow:hidden}
 .stat{flex:1;text-align:center;padding:1.25rem 1rem;border-right:1px solid rgba(255,106,0,.2);transition:background .3s}
 .stat:last-child{border-right:none}
 .stat:hover{background:rgba(255,106,0,.08)}
@@ -1216,60 +1350,37 @@ tr:hover td{background:rgba(255,106,0,.05)}
 .cert-btn{background:none;border:1px solid rgba(255,215,0,.4);color:var(--yellow);padding:.4rem .8rem;font-family:'Bangers',cursive;font-size:.85rem;letter-spacing:.1em;cursor:pointer;border-radius:2px;transition:all .2s}
 .cert-btn:hover{background:rgba(255,215,0,.1)}
 .dragonballs{display:flex;justify-content:center;gap:.75rem;margin:1rem auto}
-.dball{width:18px;height:18px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#fff8e0,var(--yellow) 40%,var(--orange) 80%,#8b4500);box-shadow:0 0 8px rgba(255,215,0,.5);position:relative;transition:transform .2s;cursor:default}
+.dball{width:18px;height:18px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#fff8e0,var(--yellow) 40%,var(--orange) 80%,#8b4500);box-shadow:0 0 8px rgba(255,215,0,.5);transition:transform .2s;cursor:default}
 .dball:hover{transform:scale(1.3);box-shadow:0 0 15px rgba(255,215,0,.8)}
 .grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:2rem}
-::-webkit-scrollbar{width:6px}
-::-webkit-scrollbar-track{background:#0a0500}
-::-webkit-scrollbar-thumb{background:var(--orange);border-radius:3px}
-.scouter-scan{position:fixed;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:3;background:linear-gradient(0deg,transparent 48%,rgba(0,255,0,.02) 50%,transparent 52%);animation:scouterscan 5s linear infinite}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:#0a0500}::-webkit-scrollbar-thumb{background:var(--orange);border-radius:3px}
+.scouter-scan{position:fixed;inset:0;pointer-events:none;z-index:3;background:linear-gradient(0deg,transparent 48%,rgba(0,255,0,.02) 50%,transparent 52%);animation:scouterscan 5s linear infinite}
 @keyframes scouterscan{0%{transform:translateY(-100%)}100%{transform:translateY(100%)}}
 .ki-particle{position:fixed;pointer-events:none;z-index:9999;border-radius:50%;background:radial-gradient(circle,#fff,var(--yellow),var(--orange));animation:kiblast .6s ease-out forwards}
 @keyframes kiblast{0%{transform:scale(0);opacity:1}50%{opacity:.8}100%{transform:scale(3);opacity:0}}
 @keyframes kicharge{0%{box-shadow:0 0 5px var(--orange)}50%{box-shadow:0 0 30px var(--yellow),0 0 60px var(--orange)}100%{box-shadow:0 0 5px var(--orange)}}
 .ki-charging{animation:kicharge 1s ease-in-out infinite}
-"""
+""" + PIXEL_ART_CSS
 
 TIMER_JS = """
-function updateTimer() {
-  const start = new Date("{{ start_time }}").getTime();
-  const end   = new Date("{{ end_time }}").getTime();
-  const now   = new Date().getTime();
-  const timerEl    = document.getElementById('timer');
-  const timerLabel = document.getElementById('timer-label');
-  if (!timerEl) return;
-  if (!start || isNaN(start)) { timerEl.textContent = 'OPEN'; return; }
-  if (now < start) {
-    timerLabel.textContent = 'BATTLE BEGINS IN';
-    timerEl.textContent = formatTime(start - now);
-  } else if (now < end) {
-    const diff = end - now;
-    timerLabel.textContent = 'POWER REMAINING';
-    timerEl.textContent = formatTime(diff);
-    timerEl.style.color = diff < 3600000 ? 'var(--red)' : 'var(--yellow)';
-  } else {
-    timerLabel.textContent = 'BATTLE OVER';
-    timerEl.textContent = '00:00:00';
-    timerEl.style.color = 'var(--red)';
-  }
+function updateTimer(){
+  const start=new Date("{{ start_time }}").getTime(),end=new Date("{{ end_time }}").getTime(),now=new Date().getTime();
+  const te=document.getElementById('timer'),tl=document.getElementById('timer-label');
+  if(!te)return;
+  if(!start||isNaN(start)){te.textContent='OPEN';return}
+  if(now<start){tl.textContent='BATTLE BEGINS IN';te.textContent=fmt(start-now);}
+  else if(now<end){const d=end-now;tl.textContent='POWER REMAINING';te.textContent=fmt(d);te.style.color=d<3600000?'var(--red)':'var(--yellow)';}
+  else{tl.textContent='BATTLE OVER';te.textContent='00:00:00';te.style.color='var(--red)';}
 }
-function formatTime(ms) {
-  const h = Math.floor(ms/3600000);
-  const m = Math.floor((ms%3600000)/60000);
-  const s = Math.floor((ms%60000)/1000);
-  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-}
-updateTimer();
-setInterval(updateTimer, 1000);
+function fmt(ms){const h=Math.floor(ms/3600000),m=Math.floor(ms%3600000/60000),s=Math.floor(ms%60000/1000);return`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;}
+updateTimer();setInterval(updateTimer,1000);
 """
 
 LOGIN_HTML = """<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"><title>Login - {{ ctf_name }}</title>
+<html lang="en"><head><meta charset="UTF-8"><title>Login - {{ ctf_name }}</title>
 <style>""" + BASE_STYLE + """
 .login-wrapper{min-height:100vh;display:flex;align-items:center;justify-content:center;position:relative;z-index:10}
-</style></head>
-<body>
+</style></head><body>
 """ + DBZ_INTRO + """
 <div id="characters-layer"></div>
 <div class="scouter-scan"></div>
@@ -1284,22 +1395,15 @@ LOGIN_HTML = """<!DOCTYPE html>
 <div class="login-wrapper">
   <div class="container" style="margin:0;width:100%">
     <div style="text-align:center;margin-bottom:1.5rem">
-      <div class="dragonballs">
-        <div class="dball"></div><div class="dball"></div><div class="dball"></div>
-        <div class="dball"></div><div class="dball"></div><div class="dball"></div><div class="dball"></div>
-      </div>
+      <div class="dragonballs"><div class="dball"></div><div class="dball"></div><div class="dball"></div><div class="dball"></div><div class="dball"></div><div class="dball"></div><div class="dball"></div></div>
     </div>
     <div class="card">
       <h2>⚡ WARRIOR LOGIN</h2>
-      <div class="form-group"><label>TEAM NAME</label>
-        <input type="text" id="team" placeholder="Enter your warrior name"/></div>
+      <div class="form-group"><label>TEAM NAME</label><input type="text" id="team" placeholder="Enter your warrior name"/></div>
       <div class="form-group"><label>PASSWORD</label>
-        <div class="pw-wrap">
-          <input type="password" id="password" placeholder="••••••••"/>
-          <button class="pw-toggle" onclick="togglePw('password','eye1')" type="button"><span id="eye1">👁</span></button>
-        </div>
-      </div>
-      <button class="btn btn-full btn-ki" id="login-btn" onclick="login()">⚡ POWER UP & LOGIN</button>
+        <div class="pw-wrap"><input type="password" id="password" placeholder="••••••••"/>
+          <button class="pw-toggle" onclick="togglePw('password','eye1')" type="button"><span id="eye1">👁</span></button></div></div>
+      <button class="btn btn-full btn-ki" id="login-btn" onclick="doLogin()">⚡ POWER UP & LOGIN</button>
       <div class="text-center"><a href="/register" class="link">No account? Join the battle →</a></div>
     </div>
   </div>
@@ -1307,35 +1411,32 @@ LOGIN_HTML = """<!DOCTYPE html>
 <script>
 function togglePw(i,e){const inp=document.getElementById(i),eye=document.getElementById(e);inp.type=inp.type==='password'?'text':'password';eye.textContent=inp.type==='password'?'👁':'🙈'}
 function spawnKi(x,y){const p=document.createElement('div');p.className='ki-particle';const s=10+Math.random()*15;p.style.cssText=`left:${x-s/2}px;top:${y-s/2}px;width:${s}px;height:${s}px`;document.body.appendChild(p);setTimeout(()=>p.remove(),600)}
-document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('#characters-layer'))return;spawnKi(e.clientX,e.clientY);for(let i=0;i<2;i++)setTimeout(()=>spawnKi(e.clientX+(Math.random()-.5)*30,e.clientY+(Math.random()-.5)*30),i*80)});
-async function login(){
+document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('#characters-layer'))return;spawnKi(e.clientX,e.clientY)});
+async function doLogin(){
   const team=document.getElementById('team').value.trim(),password=document.getElementById('password').value;
   document.querySelectorAll('.alert').forEach(m=>m.remove());
-  if(!team||!password)return showAlert('⚠ Fill in all fields, warrior!','error');
+  if(!team||!password)return showAlert('⚠ Fill in all fields!','error');
   const btn=document.getElementById('login-btn');
   btn.textContent='⚡ CHARGING KI...';btn.disabled=true;btn.classList.add('ki-charging');
   try{
     const r=await fetch('/api/v1/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({team_name:team,password})});
     const data=await r.json();
     if(data.success){
-      localStorage.setItem('ctf_token',data.token);localStorage.setItem('ctf_team',data.team);localStorage.setItem('ctf_is_admin',data.is_admin===true?'true':'false');
-      showAlert('🐉 POWER LEVEL MAXIMUM! Entering battle...','success');
-      for(let i=0;i<10;i++)setTimeout(()=>spawnKi(Math.random()*window.innerWidth,Math.random()*window.innerHeight),i*80);
+      localStorage.setItem('ctf_token',data.token);localStorage.setItem('ctf_team',data.team);localStorage.setItem('ctf_is_admin',data.is_admin?'true':'false');
+      showAlert('🐉 POWER LEVEL MAXIMUM!','success');
       setTimeout(()=>window.location.href=data.is_admin?'/admin':'/',1000);
     }else{showAlert('💀 '+(data.message||'Login failed'),'error');btn.textContent='⚡ POWER UP & LOGIN';btn.disabled=false;btn.classList.remove('ki-charging')}
   }catch(e){showAlert('⚠ Network error','error');btn.textContent='⚡ POWER UP & LOGIN';btn.disabled=false;btn.classList.remove('ki-charging')}
 }
 function showAlert(msg,type){document.querySelector('.card').insertAdjacentHTML('afterbegin',`<div class="alert alert-${type}">${msg}</div>`)}
-document.addEventListener('keydown',e=>{if(e.key==='Enter')login()});
+document.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
 </script>
-<script>""" + CHARACTER_JS + """</script>
+<script>""" + PIXEL_CHARS_JS + """</script>
 </body></html>"""
 
 REGISTER_HTML = """<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"><title>Register - {{ ctf_name }}</title>
-<style>""" + BASE_STYLE + """</style></head>
-<body>
+<html lang="en"><head><meta charset="UTF-8"><title>Register - {{ ctf_name }}</title>
+<style>""" + BASE_STYLE + """</style></head><body>
 """ + DBZ_INTRO + """
 <div id="characters-layer"></div>
 <div class="scouter-scan"></div>
@@ -1346,10 +1447,7 @@ REGISTER_HTML = """<!DOCTYPE html>
 <div style="display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 80px);position:relative;z-index:10">
   <div class="container" style="margin:2rem auto;width:100%">
     <div style="text-align:center;margin-bottom:1rem">
-      <div class="dragonballs">
-        <div class="dball"></div><div class="dball"></div><div class="dball"></div>
-        <div class="dball"></div><div class="dball"></div><div class="dball"></div><div class="dball"></div>
-      </div>
+      <div class="dragonballs"><div class="dball"></div><div class="dball"></div><div class="dball"></div><div class="dball"></div><div class="dball"></div><div class="dball"></div><div class="dball"></div></div>
     </div>
     <div class="card">
       <h2>🐉 JOIN THE BATTLE</h2>
@@ -1362,7 +1460,7 @@ REGISTER_HTML = """<!DOCTYPE html>
         <div class="pw-wrap"><input type="password" id="confirm" placeholder="repeat password"/>
           <button class="pw-toggle" onclick="togglePw('confirm','eye2')" type="button"><span id="eye2">👁</span></button></div></div>
       <div class="form-group"><label>COUNTRY (optional)</label><input type="text" id="country" placeholder="Planet Vegeta"/></div>
-      <button class="btn btn-full btn-ki" id="reg-btn" onclick="register()">🐉 SUMMON THE DRAGON</button>
+      <button class="btn btn-full btn-ki" id="reg-btn" onclick="doRegister()">🐉 SUMMON THE DRAGON</button>
       <div class="text-center"><a href="/login" class="link">Already a warrior? Login →</a></div>
     </div>
   </div>
@@ -1371,7 +1469,7 @@ REGISTER_HTML = """<!DOCTYPE html>
 function togglePw(i,e){const inp=document.getElementById(i),eye=document.getElementById(e);inp.type=inp.type==='password'?'text':'password';eye.textContent=inp.type==='password'?'👁':'🙈'}
 function spawnKi(x,y){const p=document.createElement('div');p.className='ki-particle';const s=10+Math.random()*15;p.style.cssText=`left:${x-s/2}px;top:${y-s/2}px;width:${s}px;height:${s}px`;document.body.appendChild(p);setTimeout(()=>p.remove(),600)}
 document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('#characters-layer'))return;spawnKi(e.clientX,e.clientY)});
-async function register(){
+async function doRegister(){
   const name=document.getElementById('name').value.trim(),email=document.getElementById('email').value.trim(),password=document.getElementById('password').value,confirm=document.getElementById('confirm').value,country=document.getElementById('country').value.trim();
   document.querySelectorAll('.alert').forEach(m=>m.remove());
   if(!name||!email||!password)return showAlert('⚠ Fill in all required fields!','error');
@@ -1382,14 +1480,14 @@ async function register(){
     const r=await fetch('/api/v1/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({team_name:name,email,password,country})});
     const data=await r.json();
     showAlert((data.success?'🐉 ':'⚠ ')+data.message,data.success?'success':'error');
-    if(data.success){for(let i=0;i<12;i++)setTimeout(()=>spawnKi(Math.random()*window.innerWidth,Math.random()*window.innerHeight),i*60);setTimeout(()=>window.location.href='/login',2500)}
+    if(data.success)setTimeout(()=>window.location.href='/login',2500);
     else{btn.textContent='🐉 SUMMON THE DRAGON';btn.disabled=false;btn.classList.remove('ki-charging')}
   }catch(e){showAlert('⚠ Network error','error');btn.textContent='🐉 SUMMON THE DRAGON';btn.disabled=false;btn.classList.remove('ki-charging')}
 }
 function showAlert(msg,type){document.querySelector('.card').insertAdjacentHTML('afterbegin',`<div class="alert alert-${type}">${msg}</div>`)}
-document.addEventListener('keydown',e=>{if(e.key==='Enter')register()});
+document.addEventListener('keydown',e=>{if(e.key==='Enter')doRegister()});
 </script>
-<script>""" + CHARACTER_JS + """</script>
+<script>""" + PIXEL_CHARS_JS + """</script>
 </body></html>"""
 
 VERIFY_HTML = """<!DOCTYPE html>
@@ -1404,7 +1502,7 @@ VERIFY_HTML = """<!DOCTYPE html>
     {% else %}<div class="alert alert-error">💀 {{ message }}</div>{% endif %}
   </div></div>
 </div>
-<script>""" + CHARACTER_JS + """</script>
+<script>""" + PIXEL_CHARS_JS + """</script>
 </body></html>"""
 
 ADMIN_HTML = """<!DOCTYPE html>
@@ -1438,31 +1536,22 @@ ADMIN_HTML = """<!DOCTYPE html>
   <div class="panel active" id="panel-teams">
     <div class="section-title">⚔ ALL WARRIORS</div>
     <input id="search" placeholder="Search warrior..." style="padding:.5rem 1rem;background:rgba(255,106,0,.05);border:1px solid rgba(255,106,0,.3);color:#f5e6c8;font-family:'Rajdhani',sans-serif;border-radius:2px;width:300px;margin-bottom:1rem;outline:none" oninput="filterTeams()"/>
-    <table>
-      <thead><tr><th>WARRIOR</th><th>EMAIL</th><th>ORIGIN</th><th>POWER</th><th>VICTORIES</th><th>STATUS</th><th>ACTIONS</th></tr></thead>
-      <tbody id="teams-body"></tbody>
-    </table>
+    <table><thead><tr><th>WARRIOR</th><th>EMAIL</th><th>ORIGIN</th><th>POWER</th><th>VICTORIES</th><th>STATUS</th><th>ACTIONS</th></tr></thead><tbody id="teams-body"></tbody></table>
   </div>
   <div class="panel" id="panel-challenges">
     <div class="section-title">🐉 CHALLENGES</div>
-    <table>
-      <thead><tr><th>NAME</th><th>CATEGORY</th><th>POWER</th><th>DIFFICULTY</th><th>SOLVED</th><th>HINTS</th></tr></thead>
-      <tbody id="challenges-body"></tbody>
-    </table>
+    <table><thead><tr><th>NAME</th><th>CATEGORY</th><th>POWER</th><th>DIFFICULTY</th><th>SOLVED</th><th>HINTS</th></tr></thead><tbody id="challenges-body"></tbody></table>
   </div>
   <div class="panel" id="panel-solves">
     <div class="section-title">⚡ BATTLE LOG</div>
-    <table>
-      <thead><tr><th>TIME</th><th>WARRIOR</th><th>CHALLENGE</th><th>POWER</th><th>FIRST BLOOD</th></tr></thead>
-      <tbody id="solves-body"></tbody>
-    </table>
+    <table><thead><tr><th>TIME</th><th>WARRIOR</th><th>CHALLENGE</th><th>POWER</th><th>FIRST BLOOD</th></tr></thead><tbody id="solves-body"></tbody></table>
   </div>
 </div>
 <script>
 const token=localStorage.getItem('ctf_token'),isAdmin=localStorage.getItem('ctf_is_admin')==='true';
 if(!token||!isAdmin)window.location.href='/login';
 let allTeams=[];
-async function api(path,opts={}){const headers={'Content-Type':'application/json','Authorization':`Bearer ${token}`};const r=await fetch('/api/v1'+path,{headers,...opts});if(r.status===401||r.status===403){window.location.href='/login';return{}}return r.json()}
+async function api(path,opts={}){const h={'Content-Type':'application/json','Authorization':`Bearer ${token}`};const r=await fetch('/api/v1'+path,{headers:h,...opts});if(r.status===401||r.status===403){window.location.href='/login';return{}}return r.json()}
 async function loadStats(){
   const[teams,challenges,feed]=await Promise.all([api('/admin/teams'),api('/challenges'),api('/feed')]);
   allTeams=teams.teams||[];
@@ -1476,15 +1565,15 @@ async function loadStats(){
 }
 function renderTeams(teams){document.getElementById('teams-body').innerHTML=teams.map(t=>`<tr><td style="color:var(--yellow);font-family:'Bangers',cursive">${t.name}</td><td style="color:#806040;font-size:.8rem">${t.email}</td><td>${t.country||'-'}</td><td style="color:var(--orange);font-family:'Bangers',cursive;font-size:1.1rem">${t.score}</td><td>${t.solves}</td><td>${t.verified?'<span class="badge badge-green">VERIFIED</span>':'<span class="badge badge-yellow">UNVERIFIED</span>'}${t.banned?'<span class="badge badge-red" style="margin-left:4px">BANNED</span>':''}</td><td style="display:flex;gap:4px"><button class="btn btn-sm ${t.banned?'btn-blue':'btn-red'}" onclick="${t.banned?`unbanTeam('${t.name}')`:`banTeam('${t.name}')`}">${t.banned?'UNBAN':'BAN'}</button><button class="btn btn-sm" onclick="resetScore('${t.name}')">RESET</button><button class="btn btn-sm btn-red" onclick="deleteTeam('${t.name}')">DELETE</button></td></tr>`).join('')}
 function filterTeams(){const q=document.getElementById('search').value.toLowerCase();renderTeams(allTeams.filter(t=>t.name.toLowerCase().includes(q)||t.email.toLowerCase().includes(q)))}
-async function banTeam(name){if(!confirm(`Ban warrior "${name}"?`))return;await api('/admin/teams/ban',{method:'POST',body:JSON.stringify({team_name:name})});loadStats()}
-async function unbanTeam(name){if(!confirm(`Unban warrior "${name}"?`))return;await api('/admin/teams/unban',{method:'POST',body:JSON.stringify({team_name:name})});loadStats()}
-async function resetScore(name){if(!confirm(`Reset power level for "${name}"?`))return;await api('/admin/teams/reset',{method:'POST',body:JSON.stringify({team_name:name})});loadStats()}
-async function deleteTeam(name){if(!confirm(`DELETE warrior "${name}"?`))return;await api('/admin/teams/delete',{method:'POST',body:JSON.stringify({team_name:name})});loadStats()}
-function switchTab(name){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.getElementById('tab-'+name).classList.add('active');document.getElementById('panel-'+name).classList.add('active')}
+async function banTeam(n){if(!confirm(`Ban "${n}"?`))return;await api('/admin/teams/ban',{method:'POST',body:JSON.stringify({team_name:n})});loadStats()}
+async function unbanTeam(n){if(!confirm(`Unban "${n}"?`))return;await api('/admin/teams/unban',{method:'POST',body:JSON.stringify({team_name:n})});loadStats()}
+async function resetScore(n){if(!confirm(`Reset score for "${n}"?`))return;await api('/admin/teams/reset',{method:'POST',body:JSON.stringify({team_name:n})});loadStats()}
+async function deleteTeam(n){if(!confirm(`DELETE "${n}"?`))return;await api('/admin/teams/delete',{method:'POST',body:JSON.stringify({team_name:n})});loadStats()}
+function switchTab(n){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.getElementById('tab-'+n).classList.add('active');document.getElementById('panel-'+n).classList.add('active')}
 function logout(){fetch('/api/v1/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}});localStorage.clear();window.location.href='/login'}
 loadStats();setInterval(loadStats,30000);
 </script>
-<script>""" + CHARACTER_JS + """</script>
+<script>""" + PIXEL_CHARS_JS + """</script>
 </body></html>"""
 
 INDEX_HTML = """<!DOCTYPE html>
@@ -1496,8 +1585,7 @@ INDEX_HTML = """<!DOCTYPE html>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-adapter-moment/1.0.1/chartjs-adapter-moment.min.js"></script>
 <style>""" + BASE_STYLE + """</style>
-</head>
-<body>
+</head><body>
 """ + DBZ_INTRO + """
 <div id="characters-layer"></div>
 <div class="scouter-scan"></div>
@@ -1525,10 +1613,7 @@ INDEX_HTML = """<!DOCTYPE html>
     <div class="radar-circle"></div><div class="radar-circle"></div><div class="radar-circle"></div>
     <div class="radar-dot"></div>
   </div>
-  <div class="dragonballs">
-    <div class="dball"></div><div class="dball"></div><div class="dball"></div>
-    <div class="dball"></div><div class="dball"></div><div class="dball"></div><div class="dball"></div>
-  </div>
+  <div class="dragonballs"><div class="dball"></div><div class="dball"></div><div class="dball"></div><div class="dball"></div><div class="dball"></div><div class="dball"></div><div class="dball"></div></div>
   <h1 class="hero-title">{{ ctf_name }}</h1>
   <div class="hero-subtitle">{{ ctf_description }}</div>
   <div class="power-display">
@@ -1554,20 +1639,12 @@ INDEX_HTML = """<!DOCTYPE html>
   <div class="panel active" id="panel-challenges">
     <div class="section-title">⚔ BATTLE CHALLENGES</div>
     <div id="login-prompt-box"></div>
-    <div class="challenges-grid" id="challenges-grid">
-      <div style="color:#806040;padding:2rem;font-family:'Bangers',cursive;font-size:1.2rem">⚡ LOADING...</div>
-    </div>
+    <div class="challenges-grid" id="challenges-grid"><div style="color:#806040;padding:2rem;font-family:'Bangers',cursive;font-size:1.2rem">⚡ LOADING...</div></div>
   </div>
   <div class="panel" id="panel-scoreboard">
     <div class="section-title">🏆 POWER RANKINGS</div>
-    <div class="graph-container">
-      <div class="graph-title">⚡ POWER LEVEL PROGRESSION</div>
-      <canvas id="scoreGraph" height="120"></canvas>
-    </div>
-    <table>
-      <thead><tr><th>RANK</th><th>WARRIOR</th><th>POWER LEVEL</th><th>VICTORIES</th><th>LAST BATTLE</th><th></th></tr></thead>
-      <tbody id="scoreboard-body"></tbody>
-    </table>
+    <div class="graph-container"><div class="graph-title">⚡ POWER LEVEL PROGRESSION</div><canvas id="scoreGraph" height="120"></canvas></div>
+    <table><thead><tr><th>RANK</th><th>WARRIOR</th><th>POWER LEVEL</th><th>VICTORIES</th><th>LAST BATTLE</th><th></th></tr></thead><tbody id="scoreboard-body"></tbody></table>
   </div>
   <div class="panel" id="panel-feed">
     <div class="section-title">⚡ LIVE BATTLE FEED</div>
@@ -1594,14 +1671,12 @@ if(token&&team){document.getElementById('user-bar').style.display='flex';documen
 function spawnKi(x,y){const p=document.createElement('div');p.className='ki-particle';const s=10+Math.random()*15;p.style.cssText=`left:${x-s/2}px;top:${y-s/2}px;width:${s}px;height:${s}px`;document.body.appendChild(p);setTimeout(()=>p.remove(),600)}
 document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('#characters-layer'))return;spawnKi(e.clientX,e.clientY);for(let i=0;i<2;i++)setTimeout(()=>spawnKi(e.clientX+(Math.random()-.5)*30,e.clientY+(Math.random()-.5)*30),i*80)});
 function animatePowerCounter(target){const el=document.getElementById('power-counter');if(!target){el.textContent='SCOUTING...';return}let c=0;const step=Math.ceil(target/60);const iv=setInterval(()=>{c=Math.min(c+step,target);el.textContent=c.toLocaleString();if(c>=target)clearInterval(iv)},16)}
-async function api(path,opts={}){const headers={'Content-Type':'application/json'};if(token)headers['Authorization']=`Bearer ${token}`;return(await fetch('/api/v1'+path,{headers,...opts})).json()}
+async function api(path,opts={}){const h={'Content-Type':'application/json'};if(token)h['Authorization']=`Bearer ${token}`;return(await fetch('/api/v1'+path,{headers:h,...opts})).json()}
 async function loadChallenges(){
-  const data=await api('/challenges');
-  const myData=token?await api('/me/solves'):{solves:[]};
+  const data=await api('/challenges'),myData=token?await api('/me/solves'):{solves:[]};
   const mySolves=new Set((myData.solves||[]).map(s=>s.challenge_id));
-  const grid=document.getElementById('challenges-grid');
-  const prompt=document.getElementById('login-prompt-box');
-  if(!token){prompt.innerHTML=`<div class="login-prompt"><p>⚡ Login to submit flags and compete for the Dragon Balls!</p><a href="/login">⚡ LOGIN</a><a href="/register">🐉 REGISTER</a></div>`}
+  const grid=document.getElementById('challenges-grid'),prompt=document.getElementById('login-prompt-box');
+  if(!token)prompt.innerHTML=`<div class="login-prompt"><p>⚡ Login to submit flags and compete!</p><a href="/login">⚡ LOGIN</a><a href="/register">🐉 REGISTER</a></div>`;
   if(!data.challenges?.length){grid.innerHTML='<div style="color:#806040;padding:2rem;font-family:Bangers,cursive">No challenges yet...</div>';return}
   document.getElementById('stat-challenges').textContent=data.challenges.length;
   const grouped={};
@@ -1638,8 +1713,7 @@ async function drawScoreGraph(topTeams){
   scoreChart=new Chart(ctx,{type:'line',data:{datasets},options:{responsive:true,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{color:'#c8a878',font:{family:'Rajdhani',weight:'700'},boxWidth:12}},tooltip:{backgroundColor:'#120800',borderColor:'#ff6a0066',borderWidth:1,titleColor:'#ffd700',bodyColor:'#f5e6c8'}},scales:{x:{type:'time',time:{unit:'hour'},ticks:{color:'#806040',font:{family:'Share Tech Mono',size:10}},grid:{color:'rgba(255,106,0,.1)'}},y:{ticks:{color:'#806040',font:{family:'Share Tech Mono',size:10}},grid:{color:'rgba(255,106,0,.1)'}}}}});
 }
 async function loadFeed(){
-  const data=await api('/feed');
-  const feed=document.getElementById('live-feed');
+  const data=await api('/feed');const feed=document.getElementById('live-feed');
   if(!data.events?.length){feed.innerHTML='<div style="color:#806040;padding:1rem;font-family:Bangers,cursive">No battles yet!</div>';return}
   document.getElementById('stat-solves').textContent=data.events.length;
   feed.innerHTML=data.events.map(e=>`<div class="feed-item"><span class="feed-time">[${e.timestamp}]</span><span class="feed-team">⚡ ${e.team}</span><span style="color:#806040">conquered</span><span style="color:#f5e6c8">${e.challenge}</span>${e.first_blood?'<span style="color:var(--red)">🩸 FIRST BLOOD</span>':''}<span class="feed-pts">+${e.points} PL</span></div>`).join('');
@@ -1669,15 +1743,11 @@ async function unlockHint(cid,hi,cost){if(!token)return window.location.href='/l
 function closeModal(){document.getElementById('modal').classList.remove('active');currentChallenge=null}
 async function submitFlag(){
   if(!currentChallenge)return;
-  const flag=document.getElementById('flag-input').value.trim();
-  if(!flag)return;
-  const btn=document.querySelector('#modal .btn-ki');
-  btn.textContent='⚡ CHARGING...';btn.disabled=true;
+  const flag=document.getElementById('flag-input').value.trim();if(!flag)return;
+  const btn=document.querySelector('#modal .btn-ki');btn.textContent='⚡ CHARGING...';btn.disabled=true;
   const r=await fetch('/api/v1/submit',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},body:JSON.stringify({challenge_id:currentChallenge.id,flag,team})});
-  const data=await r.json();
-  btn.textContent='⚡ RELEASE KI BLAST';btn.disabled=false;
-  const msg=document.getElementById('result-msg');
-  msg.style.display='block';
+  const data=await r.json();btn.textContent='⚡ RELEASE KI BLAST';btn.disabled=false;
+  const msg=document.getElementById('result-msg');msg.style.display='block';
   msg.className='result-msg '+(data.correct?'correct':'wrong');
   msg.textContent=data.correct?'🐉 CHALLENGE CONQUERED! POWER LEVEL RISING!':'💀 '+data.message;
   if(data.correct){for(let i=0;i<20;i++)setTimeout(()=>spawnKi(Math.random()*window.innerWidth,Math.random()*window.innerHeight),i*60);setTimeout(()=>{closeModal();loadChallenges();loadScoreboard();loadFeed()},2000)}
@@ -1687,65 +1757,54 @@ function switchTab(name){document.querySelectorAll('.tab').forEach(t=>t.classLis
 function logout(){fetch('/api/v1/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}});localStorage.clear();window.location.href='/login'}
 document.getElementById('flag-input')?.addEventListener('keydown',e=>{if(e.key==='Enter')submitFlag()});
 document.getElementById('modal')?.addEventListener('click',e=>{if(e.target===document.getElementById('modal'))closeModal()});
-loadChallenges();loadFeed();
-setInterval(()=>{loadScoreboard();loadFeed()},30000);
+loadChallenges();loadFeed();setInterval(()=>{loadScoreboard();loadFeed()},30000);
 </script>
 <script>""" + TIMER_JS + """</script>
-<script>""" + CHARACTER_JS + """</script>
+<script>""" + PIXEL_CHARS_JS + """</script>
 </body></html>"""
 
 CERT_HTML = """<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"><title>Certificate - {{ team }}</title>
+<html lang="en"><head><meta charset="UTF-8"><title>Certificate - {{ team }}</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Bangers&family=Rajdhani:wght@400;700&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:radial-gradient(ellipse at center,#1a0800 0%,#0a0300 60%,#050100 100%);display:flex;align-items:center;justify-content:center;min-height:100vh;padding:2rem;font-family:'Rajdhani',sans-serif}
+body{background:radial-gradient(ellipse at center,#1a0800,#0a0300 60%,#050100);display:flex;align-items:center;justify-content:center;min-height:100vh;padding:2rem;font-family:'Rajdhani',sans-serif}
 .cert{background:linear-gradient(135deg,rgba(25,12,0,.98),rgba(10,5,0,.99));border:3px solid #ff6a00;border-radius:8px;padding:4rem;max-width:800px;width:100%;text-align:center;position:relative;box-shadow:0 0 80px rgba(255,106,0,.3),0 0 160px rgba(255,106,0,.1)}
 .cert::before{content:'';position:absolute;inset:10px;border:1px solid rgba(255,215,0,.2);border-radius:4px;pointer-events:none}
 .corner{position:absolute;width:24px;height:24px;border-color:#ffd700;border-style:solid}
 .corner-tl{top:18px;left:18px;border-width:3px 0 0 3px}.corner-tr{top:18px;right:18px;border-width:3px 3px 0 0}
 .corner-bl{bottom:18px;left:18px;border-width:0 0 3px 3px}.corner-br{bottom:18px;right:18px;border-width:0 3px 3px 0}
-.cert-logo{font-family:'Bangers',cursive;font-size:1rem;color:rgba(255,106,0,.6);letter-spacing:.3em;margin-bottom:2rem}
 .cert-title{font-family:'Bangers',cursive;font-size:3rem;background:linear-gradient(135deg,#fff,#ffd700,#ff6a00);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:.5rem;letter-spacing:.1em}
-.cert-subtitle{color:rgba(255,215,0,.7);font-size:.9rem;letter-spacing:.3em;margin-bottom:3rem;font-weight:700;text-transform:uppercase}
-.cert-text{color:#a08060;font-size:.95rem;margin-bottom:.75rem}
-.cert-name{font-family:'Bangers',cursive;font-size:2.5rem;color:#fff;margin:1rem 0;padding:.75rem 2rem;border:2px solid rgba(255,215,0,.5);display:inline-block;background:rgba(255,215,0,.05);border-radius:4px;letter-spacing:.1em;text-shadow:0 0 20px rgba(255,215,0,.5)}
-.cert-rank{font-family:'Bangers',cursive;font-size:3.5rem;color:#ffd700;margin:1rem 0;text-shadow:0 0 30px rgba(255,215,0,.6)}
+.cert-subtitle{color:rgba(255,215,0,.7);font-size:.9rem;letter-spacing:.3em;margin-bottom:3rem;font-weight:700}
+.cert-name{font-family:'Bangers',cursive;font-size:2.5rem;color:#fff;margin:1rem 0;padding:.75rem 2rem;border:2px solid rgba(255,215,0,.5);display:inline-block;background:rgba(255,215,0,.05);border-radius:4px;letter-spacing:.1em}
+.cert-rank{font-family:'Bangers',cursive;font-size:3.5rem;color:#ffd700;margin:1rem 0}
 .cert-details{display:flex;justify-content:center;gap:3rem;margin:2rem 0;padding:1.5rem;border-top:1px solid rgba(255,106,0,.3);border-bottom:1px solid rgba(255,106,0,.3)}
 .cert-detail-value{font-family:'Bangers',cursive;font-size:1.8rem;color:#ffd700}
 .cert-detail-label{font-size:.7rem;color:#806040;letter-spacing:.15em;margin-top:.25rem;font-weight:700;text-transform:uppercase}
-.cert-footer{margin-top:2rem;color:#5a3a20;font-size:.75rem;letter-spacing:.1em}
-.cert-id{color:#3a2010;font-size:.65rem;margin-top:.5rem}
-.print-btn{margin-top:2rem;padding:.75rem 2rem;background:transparent;border:2px solid #ff6a00;color:#ffd700;font-family:'Bangers',cursive;font-size:1rem;cursor:pointer;border-radius:2px;letter-spacing:.15em;transition:all .2s}
-.print-btn:hover{background:rgba(255,106,0,.15);box-shadow:0 0 20px rgba(255,106,0,.4)}
-.dragonballs{display:flex;justify-content:center;gap:.75rem;margin:1rem 0}
-.dball{width:20px;height:20px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#fff8e0,#ffd700 40%,#ff6a00 80%,#8b4500);box-shadow:0 0 10px rgba(255,215,0,.5)}
+.print-btn{margin-top:2rem;padding:.75rem 2rem;background:transparent;border:2px solid #ff6a00;color:#ffd700;font-family:'Bangers',cursive;font-size:1rem;cursor:pointer;border-radius:2px;letter-spacing:.15em}
+.dball{width:20px;height:20px;border-radius:50%;display:inline-block;background:radial-gradient(circle at 35% 35%,#fff8e0,#ffd700 40%,#ff6a00 80%,#8b4500);box-shadow:0 0 10px rgba(255,215,0,.5)}
 @media print{.print-btn{display:none}}
-</style></head>
-<body>
+</style></head><body>
 <div class="cert">
   <div class="corner corner-tl"></div><div class="corner corner-tr"></div>
   <div class="corner corner-bl"></div><div class="corner corner-br"></div>
-  <div class="cert-logo">🐉 {{ ctf_name | upper }} // CTF 🐉</div>
-  <div class="dragonballs"><div class="dball"></div><div class="dball"></div><div class="dball"></div><div class="dball"></div><div class="dball"></div><div class="dball"></div><div class="dball"></div></div>
+  <div style="margin-bottom:1rem"><div class="dball"></div> <div class="dball"></div> <div class="dball"></div> <div class="dball"></div> <div class="dball"></div> <div class="dball"></div> <div class="dball"></div></div>
   <div class="cert-title">CERTIFICATE</div>
   <div class="cert-subtitle">⚡ Of Warrior Achievement ⚡</div>
-  <div class="cert-text">This certifies that the mighty warrior</div>
+  <div style="color:#a08060;margin-bottom:.75rem">This certifies that the mighty warrior</div>
   <div class="cert-name">{{ team }}</div>
-  <div class="cert-text">has proven their power in</div>
-  <div class="cert-text" style="color:#ff6a00;font-size:1.2rem;font-family:'Bangers',cursive;letter-spacing:.1em">{{ ctf_name }}</div>
+  <div style="color:#a08060;margin:.75rem 0">has proven their power in</div>
+  <div style="color:#ff6a00;font-size:1.2rem;font-family:'Bangers',cursive;letter-spacing:.1em">{{ ctf_name }}</div>
   <div class="cert-rank">{{ rank_emoji }} RANK #{{ rank }}</div>
   <div class="cert-details">
-    <div class="cert-detail"><div class="cert-detail-value">{{ score }}</div><div class="cert-detail-label">⚡ Power Level</div></div>
-    <div class="cert-detail"><div class="cert-detail-value">{{ solves }}</div><div class="cert-detail-label">⚔ Victories</div></div>
-    <div class="cert-detail"><div class="cert-detail-value">{{ rank }}</div><div class="cert-detail-label">🏆 Final Rank</div></div>
+    <div><div class="cert-detail-value">{{ score }}</div><div class="cert-detail-label">⚡ Power Level</div></div>
+    <div><div class="cert-detail-value">{{ solves }}</div><div class="cert-detail-label">⚔ Victories</div></div>
+    <div><div class="cert-detail-value">{{ rank }}</div><div class="cert-detail-label">🏆 Final Rank</div></div>
   </div>
-  <div class="cert-footer">🐉 {{ ctf_name }} — {{ date }} 🐉</div>
-  <div class="cert-id">Certificate ID: {{ cert_id }}</div>
+  <div style="color:#5a3a20;font-size:.75rem;letter-spacing:.1em">🐉 {{ ctf_name }} — {{ date }} 🐉</div>
+  <div style="color:#3a2010;font-size:.65rem;margin-top:.5rem">Certificate ID: {{ cert_id }}</div>
   <button class="print-btn" onclick="window.print()">🖨️ CLAIM YOUR SCROLL</button>
-</div>
-</body></html>"""
+</div></body></html>"""
 
 
 def create_app(config: Config = None) -> Flask:
@@ -2026,7 +2085,6 @@ def create_app(config: Config = None) -> Flask:
     return app
 
 
-# ── Entry point ──────────────────────────────────────────────────────
 app = create_app()
 
 if __name__ == "__main__":
