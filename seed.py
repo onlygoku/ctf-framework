@@ -1,6 +1,6 @@
 """
 seed.py - DBZ CTF Platform Database Seeder
-Run: python seed.py
+
 """
 
 import os, sys, json
@@ -212,22 +212,19 @@ def seed():
     cm     = ChallengeManager(config)
     db     = cm.db
 
-    # ── Challenges ───────────────────────────────────────────
+    # ── Wipe old challenges, solves, hint unlocks ────────────
+    print("\n[*] Clearing old challenge data...")
+    db.execute("DELETE FROM challenges")
+    db.execute("DELETE FROM solves")
+    db.execute("DELETE FROM hint_unlocks")
+    print("  [+] Cleared challenges, solves, hint_unlocks")
+
+    # ── Seed challenges ──────────────────────────────────────
     print("\n[*] Seeding challenges...")
     seeded = 0
 
     for ch in CHALLENGES:
-        # Skip if already exists (match by name + category)
-        existing = db.fetchone(
-            "SELECT id FROM challenges WHERE name=? AND category=?",
-            (ch["name"], ch["category"])
-        )
-        if existing:
-            print(f"  [~] SKIP   {ch['category']}/{ch['name']}")
-            continue
-
         try:
-            # Use the actual create_challenge signature from challenge_manager.py
             created = cm.create_challenge(
                 category    = ch["category"],
                 name        = ch["name"],
@@ -236,7 +233,7 @@ def seed():
                 description = ch["description"],
             )
 
-            # Override the auto-generated flag + set hints
+            # Set the real flag + hints
             db.execute(
                 "UPDATE challenges SET flag=?, hints=? WHERE id=?",
                 (ch["flag"], json.dumps(ch.get("hints", [])), created.id)
